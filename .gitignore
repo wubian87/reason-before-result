@@ -1,0 +1,5 @@
+.env
+.participant-profile.json
+.venv/
+__pycache__/
+*.pyc
