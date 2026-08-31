@@ -9,6 +9,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 cleanup() {
   [ -n "${FF:-}" ] && kill -INT "$FF" 2>/dev/null || true
   [ -n "${XVFB:-}" ] && kill "$XVFB" 2>/dev/null || true
+  [ -n "${STATUS:-}" ] && [ -e "$STATUS" ] && unlink "$STATUS" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -26,15 +27,21 @@ ffmpeg -hide_banner -loglevel error -f x11grab -draw_mouse 0 \
 FF=$!
 sleep 1
 
+STATUS=$(mktemp "$HERE/.recorder-status.XXXXXX")
 DISPLAY=$D xterm -geometry 176x52+0+0 \
   -fa 'DejaVu Sans Mono' -fs 15 \
   -bg '#0d1117' -fg '#d6dde6' -cr '#58a6ff' \
   +sb -bc \
   -xrm 'XTerm*colorBDMode: true' \
-  -e bash -lc "$CMD; echo; echo '── run complete ──'; sleep 5" >/dev/null 2>&1 &
+  -e bash -lc 'bash -lc "$1"; rc=$?; printf "\n── run complete (rc=%s) ──\n" "$rc"; printf "%s\n" "$rc" > "$2"; sleep 5' \
+  recorder "$CMD" "$STATUS" >/dev/null 2>&1 &
 XT=$!
 
 wait "$XT" 2>/dev/null || true
+RUN_RC=$(tr -cd '0-9' < "$STATUS")
+[ -n "$RUN_RC" ] || RUN_RC=125
+unlink "$STATUS"
+STATUS=""
 sleep 1
 kill -INT "$FF" 2>/dev/null || true
 wait "$FF" 2>/dev/null || true
@@ -43,4 +50,9 @@ kill "$XVFB" 2>/dev/null || true
 XVFB=""
 
 dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$HERE/$OUT.mp4")
-echo "✅ $OUT.mp4  ${dur}s  $(du -h "$HERE/$OUT.mp4" | cut -f1)"
+if [ "$RUN_RC" -eq 0 ]; then
+  echo "✅ $OUT.mp4  ${dur}s  $(du -h "$HERE/$OUT.mp4" | cut -f1)"
+else
+  echo "⛔ $OUT.mp4 已保留，但被录命令退出码是 $RUN_RC"
+  exit "$RUN_RC"
+fi
