@@ -1,4 +1,10 @@
-# Devpost / lablab submission copy
+# Lablab submission copy
+
+Event: [Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackathons/alpaca-ai-trading-agents-hackathon)
+
+Lablab's completion checklist requires a working online prototype, a video
+presentation, and a pitch deck. The local upload-ready files are listed below;
+the three public URLs are filled only after publication.
 
 ## Project name
 
@@ -46,3 +52,10 @@ Streamlit · ffmpeg
 - Public GitHub: `[PENDING]`
 - Hosted application: `[PENDING]`
 - Demo video: `[PENDING]`
+
+## Upload-ready files
+
+- Cover image: `递送/cover.png` (1280x720, 16:9)
+- Pitch deck: `递送/slides/reason-before-result.pdf` (5 pages)
+- Editable deck source: `递送/slides/reason-before-result.pptx`
+- Optional technical brief: `递送/one-pager.pdf` (1 page)
