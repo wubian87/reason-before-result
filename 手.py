@@ -25,6 +25,12 @@ from pathlib import Path
 启动等待秒 = 120.0  # 服务端要起子进程，冷启动可能慢（见 漏列候选.md 第 10 条）
 调用默认超时秒 = 90.0
 默认交易集 = "account,assets,trading,stock-data,options-data"
+录屏轨迹变量 = "ALPACA_MCP_TRACE"
+
+
+def _录屏轨迹开着() -> bool:
+    """只在显式要求时把 MCP 工具名打到终端；参数与返回永不打印。"""
+    return os.environ.get(录屏轨迹变量, "").strip().lower() in 算作模拟盘
 
 
 def 引入mcp():
@@ -216,6 +222,8 @@ class 手:
             raise RuntimeError("手还没有握好：要先「with 手(...) as 手柄:」进入，才能调工具。")
         编号 = self.账本.发号("M")
         self.账本.记("MCP请求", {"工具": 工具名, "参数": 遮蔽可疑参数(参数 or {})}, 编号=编号)
+        if _录屏轨迹开着():
+            print(f"  → MCP  {工具名}", flush=True)
         起始 = time.monotonic()
         try:
             将来 = asyncio.run_coroutine_threadsafe(
@@ -234,6 +242,8 @@ class 手:
         成功 = not (isinstance(解析, dict) and 解析.get("错") is True)
         self.账本.记("MCP回执", {"工具": 工具名, "耗时秒": 耗时, "成功": 成功,
                                "结果": 缩短入账(解析)}, 编号=编号)
+        if _录屏轨迹开着():
+            print(f"  ← MCP  {工具名}  {'OK' if 成功 else 'STOP'}  {耗时:.3f}s", flush=True)
         return 解析
 
     def _解析结果(self, 原始结果):

@@ -1,2 +1,3 @@
 alpaca-py
 mcp
+streamlit>=1.39,<2
