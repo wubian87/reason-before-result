@@ -2,7 +2,7 @@
   "mcpServers": {
     "alpaca-paper": {
       "command": "uvx",
-      "args": ["alpaca-mcp-server"],
+      "args": ["--with", "fastmcp<4", "alpaca-mcp-server"],
       "env": {
         "ALPACA_API_KEY": "replace-with-paper-key",
         "ALPACA_SECRET_KEY": "replace-with-paper-secret",

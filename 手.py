@@ -19,7 +19,10 @@ from pathlib import Path
 
 # ---- 固定配置 ----
 服务命令 = "uvx"
-服务参数表 = ["alpaca-mcp-server"]
+# ⛔ 踩过：不钉 fastmcp 的话，uvx 每次重解析都可能装上新大版本——
+#    2026-09-01 fastmcp 4.0.0 上架，拆了 fastmcp.tools.tool，服务端 import 即崩。
+#    服务端自己声明的约束 >=3.1.0 没有上界，挡不住这个。⟹ 钉在 4 以下。
+服务参数表 = ["--with", "fastmcp<4", "alpaca-mcp-server"]
 密钥变量名 = ("ALPACA_API_KEY", "ALPACA_SECRET_KEY", "ALPACA_PAPER_TRADE", "ALPACA_TOOLSETS")
 算作模拟盘 = {"true", "1", "yes"}
 启动等待秒 = 120.0  # 服务端要起子进程，冷启动可能慢（见 漏列候选.md 第 10 条）
@@ -92,6 +95,18 @@ def 缩短入账(对象, 上限: int = 2000):
     return 对象
 
 
+def 摘要异常(意外: BaseException) -> str:
+    """ExceptionGroup 的外层文案只有「unhandled errors in a TaskGroup」，
+    真因在子异常里（撞过：fastmcp 4.0.0 拆模块那次，摘要不给 ModuleNotFoundError，
+    只能去 stderr 日志里翻）。递归摘开，逐个拼进摘要。
+    """
+    子们 = getattr(意外, "exceptions", None)
+    if not 子们:
+        return f"{type(意外).__name__}：{意外}"
+    拼接 = "；".join(摘要异常(子) for 子 in 子们)
+    return f"{type(意外).__name__}（{len(子们)} 个子异常：{拼接}）"
+
+
 class 手:
     """长会话的 MCP 客户端：__enter__ 起后台线程跑事件循环，__exit__ 干净收摊。"""
 
@@ -140,7 +155,7 @@ class 手:
         try:
             asyncio.run(self._会话生命周期())
         except BaseException as 意外:
-            self._启动失败 = self._净化文本(f"{type(意外).__name__}：{意外}")
+            self._启动失败 = self._净化文本(摘要异常(意外))
         finally:
             self._就绪.set()
 
