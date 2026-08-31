@@ -17,6 +17,15 @@ Xvfb "$D" -screen 0 ${W}x${H}x24 -nolisten tcp >/dev/null 2>&1 &
 XVFB=$!
 sleep 2
 
+# 先起录像，再让终端出现。否则快命令可能在 ffmpeg 开始前已经打完第一屏，
+# 而「一镜未剪的 MCP 真跑」会从证据开头少一截。
+ffmpeg -hide_banner -loglevel error -f x11grab -draw_mouse 0 \
+  -framerate 15 -video_size ${W}x${H} -i "$D" \
+  -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
+  -y "$HERE/$OUT.mp4" &
+FF=$!
+sleep 1
+
 DISPLAY=$D xterm -geometry 176x52+0+0 \
   -fa 'DejaVu Sans Mono' -fs 15 \
   -bg '#0d1117' -fg '#d6dde6' -cr '#58a6ff' \
@@ -24,13 +33,6 @@ DISPLAY=$D xterm -geometry 176x52+0+0 \
   -xrm 'XTerm*colorBDMode: true' \
   -e bash -lc "$CMD; echo; echo '── run complete ──'; sleep 5" >/dev/null 2>&1 &
 XT=$!
-sleep 1.5
-
-ffmpeg -hide_banner -loglevel error -f x11grab -draw_mouse 0 \
-  -framerate 15 -video_size ${W}x${H} -i "$D" \
-  -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
-  -y "$HERE/$OUT.mp4" &
-FF=$!
 
 wait "$XT" 2>/dev/null || true
 sleep 1
