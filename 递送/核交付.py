@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import struct
 import subprocess
 import sys
+import time
+import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -91,6 +94,50 @@ def media_probe(path: Path) -> dict:
     if proc.returncode != 0:
         raise RuntimeError(proc.stdout.strip())
     return json.loads(proc.stdout)
+
+
+def check_streamlit() -> None:
+    port = "18501"
+    env = os.environ.copy()
+    env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+    proc = subprocess.Popen(
+        [
+            sys.executable, "-m", "streamlit", "run", "app.py",
+            "--server.headless=true", f"--server.port={port}",
+            "--server.address=127.0.0.1",
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        detail = ""
+        for _ in range(30):
+            if proc.poll() is not None:
+                detail = f"进程提前退出 {proc.returncode}"
+                break
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/_stcore/health", timeout=0.5
+                ) as response:
+                    body = response.read().decode("utf-8", errors="replace").strip()
+                    if response.status == 200 and body == "ok":
+                        add("PASS", "托管 Demo", "Streamlit 健康端点返回 ok")
+                        return
+                    detail = f"HTTP {response.status}: {body[:80]}"
+            except Exception as exc:
+                detail = str(exc)
+            time.sleep(0.25)
+        add("FAIL", "托管 Demo", detail or "健康端点超时")
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
 
 
 def check_files() -> None:
@@ -186,6 +233,7 @@ def main() -> int:
     check_command("代码编译", [sys.executable, "-m", "py_compile", *tracked_python])
     check_command("七条风控自检", [sys.executable, "闸自检.py"], "10 个相符，0 个不符")
     check_command("账本/MCP 手自检", [sys.executable, "手自检.py"], "✅ 写 6 条、读回 6 条")
+    check_streamlit()
     check_repository_hygiene()
     check_copy(args.final)
     check_artifacts(args.final)
