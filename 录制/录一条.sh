@@ -28,24 +28,29 @@ FF=$!
 sleep 1
 
 STATUS=$(mktemp "$HERE/.recorder-status.XXXXXX")
-DISPLAY=$D xterm -geometry 176x52+0+0 \
+DISPLAY=$D xterm -geometry 176x44+0+0 \
   -fa 'DejaVu Sans Mono' -fs 15 \
   -bg '#0d1117' -fg '#d6dde6' -cr '#58a6ff' \
   +sb -bc \
   -xrm 'XTerm*colorBDMode: true' \
-  -e bash -lc 'bash -lc "$1"; rc=$?; printf "\n── run complete (rc=%s) ──\n" "$rc"; printf "%s\n" "$rc" > "$2"; sleep 5' \
+  -e bash -lc 'printf "PAPER ONLY | ONE UNCUT MCP RUN | SAFE TRACE\n\n"; sleep 1; bash -lc "$1"; rc=$?; printf "\n── run complete (rc=%s) ──\n" "$rc"; printf "%s\n" "$rc" > "$2"; sleep 5' \
   recorder "$CMD" "$STATUS" >/dev/null 2>&1 &
 XT=$!
 
-wait "$XT" 2>/dev/null || true
+# 被录命令写下退出码后，xterm 还会在完成画面停 5 秒。
+# 在它消失前关录像，否则末帧会变黑，合成时 tpad 就会把黑屏冻住。
+while [ ! -s "$STATUS" ] && kill -0 "$XT" 2>/dev/null; do
+  sleep 0.1
+done
 RUN_RC=$(tr -cd '0-9' < "$STATUS")
 [ -n "$RUN_RC" ] || RUN_RC=125
-unlink "$STATUS"
-STATUS=""
-sleep 1
+sleep 3
 kill -INT "$FF" 2>/dev/null || true
 wait "$FF" 2>/dev/null || true
 FF=""
+wait "$XT" 2>/dev/null || true
+unlink "$STATUS"
+STATUS=""
 kill "$XVFB" 2>/dev/null || true
 XVFB=""
 
