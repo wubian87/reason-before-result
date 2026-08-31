@@ -259,6 +259,7 @@ def main() -> int:
     check_command("代码编译", [sys.executable, "-m", "py_compile", *tracked_python])
     check_command("七条风控自检", [sys.executable, "闸自检.py"], "10 个相符，0 个不符")
     check_command("账本/MCP 手自检", [sys.executable, "手自检.py"], "✅ 写 6 条、读回 6 条")
+    check_command("录制链脚本", ["bash", "-n", "录制/录一条.sh", "录制/合成.sh"])
     check_streamlit()
     check_repository_hygiene()
     check_copy(args.final)
