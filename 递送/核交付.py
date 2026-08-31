@@ -220,6 +220,32 @@ def check_artifacts(final: bool) -> None:
         add("FAIL", "正式成片", str(exc))
 
 
+def check_question4(final: bool) -> None:
+    evidence = ROOT / "递送/question4-result.md"
+    if not evidence.is_file():
+        add(
+            "FAIL" if final else "PENDING",
+            "问 4",
+            "园主让不懂的人看成片前 15 秒；结果尚未回来，AI 不代做",
+        )
+        return
+    text = evidence.read_text(encoding="utf-8")
+    required = (
+        "Paper/simulated: yes",
+        "Options: yes",
+        "Stops after loss: yes",
+        "Observer quote:",
+    )
+    missing = [item for item in required if item not in text]
+    quote = re.search(r"Observer quote:\s*(\S.{8,})", text)
+    ok = not missing and quote is not None
+    add(
+        "PASS" if ok else "FAIL",
+        "问 4",
+        "三格复述与原话已落纸" if ok else f"缺：{', '.join(missing) or '完整原话'}",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--final", action="store_true", help="公开提交前严格模式")
@@ -237,7 +263,7 @@ def main() -> int:
     check_repository_hygiene()
     check_copy(args.final)
     check_artifacts(args.final)
-    add("FAIL" if args.final else "PENDING", "问 4", "园主亲自做 15 秒外行复述，AI 不代做")
+    check_question4(args.final)
 
     labels = {"PASS": "✅", "PENDING": "⏳", "FAIL": "❌"}
     for result in RESULTS:
