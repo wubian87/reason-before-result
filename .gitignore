@@ -7,3 +7,6 @@ __pycache__/
 账/
 .tmp/
 *.inspect.ndjson
+录制/*.wav
+录制/*.mp4
+录制/片段/
