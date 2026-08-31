@@ -49,8 +49,8 @@ Streamlit · ffmpeg
 
 ## Links to fill
 
-- Public GitHub: `[PENDING]`
-- Hosted application: `[PENDING]`
+- Public GitHub: `https://github.com/wubian87/reason-before-result`
+- Hosted application: `https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/`
 - Demo video: `[PENDING]`
 
 ## Upload-ready files

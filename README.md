@@ -83,6 +83,8 @@ ALPACA_MCP_TRACE=true python 跑.py 体检
 
 ## Read-only hosted demo
 
+Open the live demo: <https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/>
+
 ```bash
 streamlit run app.py
 ```
