@@ -30,12 +30,16 @@ cannot rewrite its own origin story. @lablabai @AlpacaHQ
 We shipped a credential-free Streamlit demo that runs the same pure gate as the
 paper-trading CLI. It can expose every pass and stop, but it cannot read an
 account or place a trade. Judges get the real paper account ID privately and
-can verify activity with Alpaca directly. @lablabai @AlpacaHQ
+can verify activity with Alpaca directly.
+Demo: https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/
+@lablabai @AlpacaHQ
 
 ## 5 · Submission close
 
 Reason Before Result is submitted: a paper-options agent using Alpaca MCP,
 defined-risk structures, a fail-closed execution boundary, and an append-only
 ledger. The most useful output is not the P&L number—it is being able to point
-to every order and every stopped proposal and explain its cause. [Add GitHub,
-demo, and video links.] @lablabai @AlpacaHQ
+to every order and every stopped proposal and explain its cause.
+GitHub: https://github.com/wubian87/reason-before-result
+Demo: https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/
+[Add video link after upload.] @lablabai @AlpacaHQ
