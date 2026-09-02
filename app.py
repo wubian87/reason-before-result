@@ -7,9 +7,9 @@ Two things a visitor can actually do here:
   2. take that same real trade, break it by hand, and watch the production
      gate refuse it.
 
-The gate is imported from 闸.py — the exact module the paper-trading CLI uses.
+The gate is imported from gate.py — the exact module the paper-trading CLI uses.
 This page reads no credentials, holds no account, and cannot place an order.
-The frozen evidence in 递送/证据.json is a redacted snapshot of the local
+The frozen evidence in delivery/evidence.json is a redacted snapshot of the local
 append-only ledger; it carries no account identifier and no key.
 """
 
@@ -19,9 +19,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from 闸 import 过闸
+from gate import 过闸
 
-证据路径 = Path(__file__).parent / "递送" / "证据.json"
+证据路径 = Path(__file__).parent / "delivery" / "evidence.json"
 
 st.set_page_config(page_title="Reason Before Result", page_icon="🧾", layout="wide")
 
@@ -143,18 +143,35 @@ st.markdown(
 
 st.markdown(
     "<p class='note'>Paper trading only — no real capital, and not investment advice. "
-    "The dedicated paper account ID goes to the judges through the official form, not onto "
-    "this page: pull the options activity and P&amp;L from Alpaca yourself rather than "
-    "taking any of this on our word.</p>",
+    "<strong>P&amp;L is not quoted anywhere on this page on purpose.</strong> Four days of it "
+    "would be noise, and you should not have to take our number for it: the dedicated paper "
+    "account ID is in the official submission form, so pull the options activity and the P&amp;L "
+    "from Alpaca yourself.</p>",
     unsafe_allow_html=True,
 )
 
-with st.expander("The full written judgment, verbatim from the ledger (Chinese original)"):
+with st.expander("The whole thing it wrote, before the gate and before the order"):
     st.caption(
-        "The agent is operated in Chinese by a non-programmer, so its judgments are written "
-        "in Chinese. This is the untouched record — the numbers above are read out of it."
+        f"Appended to the ledger as {这一笔['编号']} at {这一笔['落纸判断时刻'][11:16]} on "
+        f"{这一笔['落纸判断时刻'][:10]}. The untouched record is in delivery/evidence.json."
     )
-    st.json(判断书)
+    st.markdown(f"**What it proposed** — {判断书['结构中文']}")
+    st.markdown("**Why**")
+    for 条 in 判断书["为什么开"]:
+        st.markdown(f"- {条}")
+    st.markdown("**The legs**")
+    st.dataframe(
+        [{"Contract": 腿["合约"], "Side": 腿["做什么"], "Strike": 腿["行权价"],
+          "Type": 腿["类型中文"], "Bid": 腿["买价"], "Ask": 腿["卖价"], "Mid": round(腿["中价"], 3)}
+         for 腿 in 判断书["腿明细"]],
+        use_container_width=True, hide_index=True,
+    )
+    甲2, 乙2, 丙2 = st.columns(3)
+    甲2.metric("Max loss", f"${钱['最大亏损美元']:,.2f}")
+    乙2.metric("Max gain", f"${钱['最大盈利美元']:,.2f}")
+    丙2.metric("Break-evens", f"{钱['盈亏平衡下沿']} / {钱['盈亏平衡上沿']}")
+    st.markdown(f"**What would prove it wrong** — {判断书['什么会证明我错']}")
+    st.markdown(f"**How it planned to get out** — {判断书['打算怎么退出']}")
 
 
 # ---------------------------------------------------------------- 二、你来改
@@ -163,7 +180,7 @@ st.markdown("<div class='kicker'>Now try to break it</div>", unsafe_allow_html=T
 st.markdown("### Take that same order and make it a bad one")
 st.caption(
     "Everything below starts as the real trade above, with its real quotes. Change it and "
-    "the production gate — the same 闸.py the live CLI imports — re-decides on every move. "
+    "the production gate — the same gate.py the live CLI imports — re-decides on every move. "
     "No credentials are read and nothing is sent anywhere."
 )
 
@@ -312,11 +329,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.expander("The gate's own receipt for what you just built (Chinese, verbatim)"):
-    st.caption("This is the untouched engine output the English above is written from.")
-    st.write(结果.get("一句话", ""))
-    for 条 in 结果.get("逐条", []):
-        st.markdown(f"**{条.get('规则')} · {条.get('名')}** — {条.get('说明', '')}")
+with st.expander("The gate's raw receipt for what you just built"):
+    st.caption("Exactly what gate.py returns — this is what gets appended to the ledger.")
+    st.json(结果)
 
 with st.expander("The proposal the gate is reading"):
     st.dataframe(提案["腿"], use_container_width=True, hide_index=True)
@@ -339,13 +354,13 @@ st.markdown("<div class='kicker'>Run it against your own paper account</div>",
             unsafe_allow_html=True)
 st.markdown("### Three commands")
 st.code(
-    "python 跑.py 体检        # preflight: MCP server up, paper flag on, account reachable\n"
-    "python 闸自检.py         # ten deterministic gate cases, no network\n"
-    "python 跑.py 开 --空转    # full path with the order call withheld",
+    "python agent.py preflight       # MCP server up, paper flag on, account reachable\n"
+    "python gate_selftest.py         # ten deterministic gate cases, no network\n"
+    "python agent.py open --dry-run  # the full path, with the order call withheld",
     language="bash",
 )
 st.markdown(
-    "<p class='note'>The order path is MCP-only: <code>手.py</code> keeps a long-lived "
+    "<p class='note'>The order path is MCP-only: <code>broker.py</code> keeps a long-lived "
     "session against <code>alpaca-mcp-server</code> over stdio and the sole multi-leg "
     "method delegates to <code>place_option_order</code>. There is no direct-HTTP bypass, "
     "and every MCP request and receipt is appended to the ledger with sensitive parameters "

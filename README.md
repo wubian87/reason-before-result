@@ -35,7 +35,7 @@ Alpaca clock/account/quotes/option chain (MCP)
                               append Alpaca receipt
 ```
 
-The order path never calls Alpaca HTTP directly. `手.py` owns a long-lived MCP
+The order path never calls Alpaca HTTP directly. `broker.py` owns a long-lived MCP
 session; its `调()` method records a redacted request and receipt around every
 tool call. The only method that places a multi-leg options order delegates to
 the MCP tool `place_option_order`.
@@ -66,13 +66,13 @@ pip install -r requirements.txt
 cp .env.example .env
 # Fill only ALPACA_API_KEY and ALPACA_SECRET_KEY. Keep PAPER=true.
 
-python 跑.py 体检
-python 闸自检.py
-python 跑.py 演闸
-python 跑.py 开 --空转
+python agent.py preflight
+python gate_selftest.py
+python agent.py rehearse
+python agent.py open --dry-run
 ```
 
-When the market is open, `python 跑.py 开` may send a **paper** order only after
+When the market is open, `python agent.py open` may send a **paper** order only after
 the written judgment and all seven rule receipts have already been appended.
 
 For a recording-safe proof that MCP is in the loop, enable the optional trace.
@@ -80,7 +80,7 @@ It prints only MCP tool names, success state, and elapsed time—never parameter
 keys, account IDs, or response bodies.
 
 ```bash
-ALPACA_MCP_TRACE=true python 跑.py 体检
+ALPACA_MCP_TRACE=true python agent.py preflight
 ```
 
 ## Read-only hosted demo
@@ -93,38 +93,38 @@ streamlit run app.py
 
 The public app needs no secrets and cannot trade. It opens on a real order this
 agent placed — order id, capped loss, and the sentence it wrote down *before*
-sending — read out of `递送/证据.json`, a redacted snapshot of the append-only
+sending — read out of `delivery/evidence.json`, a redacted snapshot of the append-only
 ledger that carries no account identifier and no key. Below it, the same trade
 is wired to the production gate: drop the protective legs, raise the size, push
-the expiry out, blank a quote, and `闸.py` re-decides live. At its default
+the expiry out, blank a quote, and `gate.py` re-decides live. At its default
 settings the page reproduces the ledger's own receipt word for word.
 
 Refreeze the snapshot from the local ledger with:
 
 ```bash
-python 递送/冻证据.py
+python delivery/freeze_evidence.py
 ```
 
 ## Repository map
 
 | File | Role |
 |---|---|
-| `跑.py` | Chinese CLI: preflight, status, gate rehearsal, open, close, recap |
-| `判.py` | Pure option-chain selection and written judgment |
-| `闸.py` | Pure seven-rule fail-closed gate |
-| `手.py` | MCP-only Alpaca client and redacted MCP ledger |
-| `账.py` | Append-only JSONL ledger and Chinese human rendering |
-| `闸自检.py` | Ten deterministic gate cases |
-| `手自检.py` | Ledger/client static and persistence checks |
+| `agent.py` | CLI: `preflight` · `status` · `rehearse` · `open` · `close` · `recap` |
+| `strategy.py` | Pure option-chain selection and the written judgment |
+| `gate.py` | Pure seven-rule fail-closed gate |
+| `broker.py` | MCP-only Alpaca client, with every call redacted into the ledger |
+| `ledger.py` | Append-only JSONL ledger and its human-readable rendering |
+| `gate_selftest.py` | Ten deterministic gate cases |
+| `broker_selftest.py` | Ledger and client static / persistence checks |
 | `app.py` | Credential-free public page: one real receipt, plus a live gate to push on |
-| `递送/冻证据.py` | Freezes a redacted evidence snapshot out of the ledger into `递送/证据.json` |
+| `delivery/freeze_evidence.py` | Freezes a redacted evidence snapshot out of the ledger into `delivery/evidence.json` |
 
 Runtime ledgers, logs, account identifiers, participant data, credentials, and
 the local virtual environment are excluded from Git.
 
 ## Safety boundary
 
-`手.py` refuses to start unless `ALPACA_PAPER_TRADE` is explicitly true. Secrets
+`broker.py` refuses to start unless `ALPACA_PAPER_TRADE` is explicitly true. Secrets
 are passed only to the MCP child process, suspicious parameter names are
 redacted before ledger writes, and raw MCP server stderr goes to a gitignored
 local log rather than the terminal or recording.

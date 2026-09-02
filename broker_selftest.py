@@ -1,4 +1,4 @@
-"""自检：直接 python3 手自检.py [项目根]（默认项目根 = 当前目录）。
+"""自检：直接 python3 broker_selftest.py [项目根]（默认项目根 = 当前目录）。
 
 本机没有密钥（ALPACA_API_KEY / ALPACA_SECRET_KEY 任一为空）时只做静态检查，
 打印「跳过：本机没有密钥，只做静态检查」，退出码 0。自检绝不下一张单。
@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True  # 别在当前目录留 __pycache__ 这种子目录
 
-import 账
-import 手
+import ledger as 账
+import broker as 手
 
 项目根 = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
 
@@ -49,7 +49,7 @@ def 挑键(结果, 键):
 def 静态检查() -> bool:
     print("== 第一步：静态检查（不需要密钥）==")
     过 = True
-    print("✅ 账.py、手.py 都能正常导入")
+    print("✅ ledger.py and broker.py both import cleanly")
 
     # mcp SDK 按需导入，这里单独提一句装没装，不影响静态检查的结果
     try:

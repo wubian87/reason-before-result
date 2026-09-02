@@ -10,3 +10,12 @@ __pycache__/
 录制/*.wav
 录制/*.mp4
 录制/片段/
+
+# 只上果：下面是过程物，本地留着、⛔ 不进公开仓
+CLAUDE.md
+黑客松-alpaca.seed.md
+录制/
+delivery/video-script.md
+delivery/social-drafts.md
+delivery/submission.md
+delivery/check_delivery.py

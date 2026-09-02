@@ -1,4 +1,4 @@
-"""从账本里冻一份脱敏证据快照进 递送/证据.json。
+"""从账本里冻一份脱敏证据快照进 delivery/evidence.json。
 
 只抄白名单字段。账户号、密钥、参与者资料一律不经过这里。
 """
@@ -87,7 +87,7 @@ if 坏:
     print("⛔ 脱敏没过，停：", 坏, file=sys.stderr)
     sys.exit(1)
 
-open("递送/证据.json", "w").write(文本 + "\n")
-print(f"写好 递送/证据.json，{len(文本)} 字符")
+open("delivery/evidence.json", "w").write(文本 + "\n")
+print(f"写好 delivery/evidence.json，{len(文本)} 字符")
 print("拦的条数：", len(证据["账上留过的拦"]))
 print("order id：", 证据["这一笔"]["券商回执"]["order_id"])

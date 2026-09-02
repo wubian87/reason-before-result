@@ -1,6 +1,6 @@
-"""闸自检.py —— 期权下单风控闸的离线自检脚本。
+"""gate_selftest.py —— 期权下单风控闸的离线自检脚本。
 
-用法：python3 闸自检.py
+用法：python3 gate_selftest.py
     · 拿写死的假数据跑 10 个用例，逐个打印结果并断言与期望相符。
     · 对被拦的用例，还要断言拦它的正是期望的那条规则。
     · 最后打印总账，并附上用例 2（裸卖）被拦的完整七条判罚表。
@@ -10,7 +10,7 @@
 import sys
 import unicodedata
 
-from 闸 import 过闸
+from gate import 过闸
 
 今天 = "2026-08-31"
 常用到期 = "2026-09-04"

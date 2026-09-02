@@ -12,7 +12,7 @@
     --根 <路径>   项目根目录，默认当前目录
     --账 <路径>   账本目录，默认 <根>/账
 
-闸.py / 手.py / 账.py 由别人同时在写，这里全部延迟到子命令真正用到时才 import，
+gate.py / broker.py / ledger.py 由别人同时在写，这里全部延迟到子命令真正用到时才 import，
 保证 python3 跑.py --help 不依赖它们也能打出中文帮助。
 """
 
@@ -206,7 +206,7 @@ def 跑体检(参):
     线()
     print("  【一 · 不联网】")
     模块们在 = {}
-    for 名 in ("闸", "手", "账", "判"):
+    for 名 in ("gate", "broker", "ledger", "strategy"):
         try:
             引入(名)
             模块们在[名] = True
@@ -223,13 +223,13 @@ def 跑体检(参):
         print("  ⛔ 密钥文件 .env 不存在（要放在项目根下，名字就叫 .env）")
         红.append(".env 不存在")
     print("  【二 · 联机】")
-    if not (模块们在.get("手") and 模块们在.get("账")):
-        print("  ⛔ 手.py / 账.py 没加载成，联机部分跳过")
+    if not (模块们在.get("broker") and 模块们在.get("ledger")):
+        print("  ⛔ broker.py / ledger.py 没加载成，联机部分跳过")
         红.append("联机部分没做成")
     else:
         try:
-            账 = 引入("账")
-            手模块 = 引入("手")
+            账 = 引入("ledger")
+            手模块 = 引入("broker")
             账本 = 账.账本(参.账)
             with 手模块.手(账本, 参.根) as 手柄:
                 时钟原始 = 手柄.时钟()
@@ -256,8 +256,8 @@ def 跑体检(参):
 # ---------- 子命令：看 ----------
 
 def 跑看(参):
-    账 = 引入("账")
-    手模块 = 引入("手")
+    账 = 引入("ledger")
+    手模块 = 引入("broker")
     账本 = 账.账本(参.账)
     今天 = date.today().isoformat()
     with 手模块.手(账本, 参.根) as 手柄:
@@ -351,8 +351,8 @@ def 造缺报价提案(账本, 到期日):
 
 
 def 跑演闸(参):
-    闸 = 引入("闸")
-    账 = 引入("账")
+    闸 = 引入("gate")
+    账 = 引入("ledger")
     账本 = 账.账本(参.账)
     今天 = date.today().isoformat()
     到期日 = date.today() + timedelta(days=5)
@@ -416,10 +416,10 @@ def 组装账户(账户原始, 持仓们):
 
 
 def 跑开(参):
-    账 = 引入("账")
-    手模块 = 引入("手")
-    闸 = 引入("闸")
-    判 = 引入("判")
+    账 = 引入("ledger")
+    手模块 = 引入("broker")
+    闸 = 引入("gate")
+    判 = 引入("strategy")
     账本 = 账.账本(参.账)
     编号 = None
     try:
@@ -515,9 +515,9 @@ def 跑开(参):
 # ---------- 子命令：平 ----------
 
 def 跑平(参):
-    账 = 引入("账")
-    手模块 = 引入("手")
-    判 = 引入("判")
+    账 = 引入("ledger")
+    手模块 = 引入("broker")
+    判 = 引入("strategy")
     账本 = 账.账本(参.账)
     今天 = date.today().isoformat()
     try:
@@ -595,7 +595,7 @@ def 一句话来路(类, 正文):
 
 
 def 跑复盘(参):
-    账 = 引入("账")
+    账 = 引入("ledger")
     账本 = 账.账本(参.账)
     今天 = date.today().isoformat()
     try:
@@ -635,7 +635,7 @@ def 跑复盘(参):
     # 当前权益、当日盈亏：尽力连一次账户，拿不到就在小结里写明
     权益 = 当日 = None
     try:
-        手模块 = 引入("手")
+        手模块 = 引入("broker")
         with 手模块.手(账本, 参.根) as 手柄:
             账户原始 = 手柄.账户()
         权益 = 浮(取键(账户原始, "equity"))
@@ -702,23 +702,37 @@ class 中文解析器(argparse.ArgumentParser):
         sys.exit(2)
 
 
+# 英文动词是对外那一层；中文动词留着当别名，⛔ 免得已排好的定时任务断掉。
+命令别名 = {"preflight": "体检", "status": "看", "rehearse": "演闸",
+            "open": "开", "close": "平", "recap": "复盘"}
+
+
 def 建解析器():
     中文化argparse()
     解析器 = 中文解析器(
-        prog="跑.py",
-        description="期权模拟盘的中文命令行入口：体检、看、演闸、开、平、复盘。",
-        epilog="例：python3 跑.py 开 --空转　（闸放行也不真下单）")
-    解析器.add_argument("--根", default=".", help="项目根目录（默认：当前目录）")
-    解析器.add_argument("--账", default=None, help="账本目录（默认：<根>/账）")
+        prog="agent.py",
+        description="Paper-options agent CLI: preflight, status, rehearse, open, close, recap.",
+        epilog="e.g. python3 agent.py open --dry-run   (gate may release; no order is sent)")
+    解析器.add_argument("--根", "--root", dest="根", default=".",
+                        help="project root (default: current directory)")
+    解析器.add_argument("--账", "--ledger", dest="账", default=None,
+                        help="ledger directory (default: <root>/账)")
     子 = 解析器.add_subparsers(dest="命令", required=True,
-                                metavar="{体检,看,演闸,开,平,复盘}")
-    子.add_parser("体检", help="检查四个模块能不能加载、密钥文件在不在，再连一次账户和时钟")
-    子.add_parser("看", help="给不懂的人看 15 秒的那一屏：权益、持仓、止损线")
-    子.add_parser("演闸", help="三笔写死的假提案过闸，留账面证据（休市也能做）")
-    开 = 子.add_parser("开", help="一轮完整动作：取链→挑组合→落纸→过闸→（可选）下单")
-    开.add_argument("--空转", action="store_true", help="闸放行也不真下单")
-    子.add_parser("平", help="平掉到期或已赚到一半权利金的持仓")
-    子.add_parser("复盘", help="把当天账本渲染成 Markdown 日志并写小结")
+                                metavar="{preflight,status,rehearse,open,close,recap}")
+    子.add_parser("preflight", aliases=["体检"],
+                  help="load all four modules, check the key file, then reach the account and clock")
+    子.add_parser("status", aliases=["看"],
+                  help="the 15-second screen: paper flag, equity, open positions, daily stop")
+    子.add_parser("rehearse", aliases=["演闸"],
+                  help="run three deliberately bad proposals through the gate (works when the market is shut)")
+    开 = 子.add_parser("open", aliases=["开"],
+                       help="one full pass: chain -> pick -> write the judgment -> gate -> (optionally) order")
+    开.add_argument("--dry-run", "--空转", dest="空转", action="store_true",
+                    help="stop before sending, even if the gate releases")
+    子.add_parser("close", aliases=["平"],
+                  help="close positions that expired or already earned half the credit")
+    子.add_parser("recap", aliases=["复盘"],
+                  help="render today's ledger into a Markdown log and write the summary")
     return 解析器
 
 
@@ -729,6 +743,7 @@ def 主():
     if not 参.账:
         参.账 = os.path.join(参.根, "账")
     分发 = {"体检": 跑体检, "看": 跑看, "演闸": 跑演闸, "开": 跑开, "平": 跑平, "复盘": 跑复盘}
+    参.命令 = 命令别名.get(参.命令, 参.命令)
     try:
         码 = 分发[参.命令](参)
     except SystemExit:

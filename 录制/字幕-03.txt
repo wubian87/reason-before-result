@@ -1,1 +1,0 @@
-Market data arrives through MCP. Only tool names and timing are shown.

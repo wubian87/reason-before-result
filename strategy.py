@@ -1,4 +1,4 @@
-"""判.py —— 期权组合的挑选与落纸判断模块。
+"""strategy.py —— 期权组合的挑选与落纸判断模块。
 
 对外只有两样东西：
     默认判据: dict
@@ -28,9 +28,9 @@ from datetime import date
 
 # 三种结构给人看的全名
 结构中文名 = {
-    "铁鹰": "铁鹰（同时卖出一组认沽价差和一组认购价差，两边都有保护腿）",
-    "看跌信用价差": "看跌信用价差（卖出一组认沽，再买一行权价更低的认沽作保护，收一笔净权利金）",
-    "看涨信用价差": "看涨信用价差（卖出一组认购，再买一行权价更高的认购作保护，收一笔净权利金）",
+    "铁鹰": "Iron condor — a put spread and a call spread sold together, each with a protective long leg",
+    "看跌信用价差": "Put credit spread — sell a put, buy a lower-strike put as protection, take in a net credit",
+    "看涨信用价差": "Call credit spread — sell a call, buy a higher-strike call as protection, take in a net credit",
 }
 
 # 「不开」时钱那一栏全部留空，不编数
@@ -67,13 +67,17 @@ def 简洁数(值):
     return f"{值:.2f}"
 
 
+_月名 = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
 def 中文日期(日期串):
-    """'2026-09-04' → '9 月 4 日'。"""
+    """'2026-09-04' → 'Sep 4'。名字是历史遗留，出的是给评委看的英文。"""
     try:
         日 = date.fromisoformat(str(日期串))
     except (TypeError, ValueError):
         return str(日期串)
-    return f"{日.month} 月 {日.day} 日"
+    return f"{_月名[日.month - 1]} {日.day}"
 
 
 def 向下取整到分(值):
@@ -318,41 +322,48 @@ def 挑一个(链, 标的, 标的现价, 今天, 判据=None):
     到期中文 = 中文日期(到期)
     为什么开 = []
     if 结构 == "铁鹰":
-        为什么开.append(f"只赌时间，不赌方向：这个结构不需要猜涨跌，只要 {标的} 在 {到期中文} 之前"
-                        f"不跌破 {简洁数(卖认沽['行权价'])}、也不涨过 {简洁数(卖认购['行权价'])} 就赚。")
+        为什么开.append(f"No directional bet. This position wins on time: it only needs {标的} to "
+                        f"stay above {简洁数(卖认沽['行权价'])} and below {简洁数(卖认购['行权价'])} "
+                        f"through {到期中文}.")
         最大d = max(abs(卖认沽["delta"]), abs(卖认购["delta"]))
-        为什么开.append(f"卖出腿的 delta 最大约 {简洁数(round(最大d, 2))}，意味着按市场自己的定价，"
-                        f"到期时最不利那一边被打穿的概率约 {简洁数(round(最大d * 100))}%。")
+        为什么开.append(f"The short legs carry at most about {简洁数(round(最大d, 2))} delta, so by the "
+                        f"market's own pricing the worse side finishes in the money roughly "
+                        f"{简洁数(round(最大d * 100))}% of the time.")
     elif 结构 == "看跌信用价差":
         d = abs(卖认沽["delta"])
-        为什么开.append(f"只赌时间，不赌方向：这个结构不需要猜涨跌，只要 {标的} 在 {到期中文} 之前"
-                        f"不跌破 {简洁数(卖认沽['行权价'])} 就赚；真跌穿了，还有一行权价更低的认沽接着，亏有底。")
-        为什么开.append(f"卖出腿的 delta 约 {简洁数(round(d, 2))}，意味着按市场自己的定价，"
-                        f"到期时被打穿的概率约 {简洁数(round(d * 100))}%。")
+        为什么开.append(f"No directional bet. This position wins on time: it only needs {标的} to stay "
+                        f"above {简洁数(卖认沽['行权价'])} through {到期中文}. If it does break down, the "
+                        f"lower-strike long put caps how far the loss can go.")
+        为什么开.append(f"The short leg carries about {简洁数(round(d, 2))} delta, so by the market's own "
+                        f"pricing it finishes in the money roughly {简洁数(round(d * 100))}% of the time.")
     else:
         d = abs(卖认购["delta"])
-        为什么开.append(f"只赌时间，不赌方向：这个结构不需要猜涨跌，只要 {标的} 在 {到期中文} 之前"
-                        f"不涨过 {简洁数(卖认购['行权价'])} 就赚；真涨穿了，还有一行权价更高的认购接着，亏有底。")
-        为什么开.append(f"卖出腿的 delta 约 {简洁数(round(d, 2))}，意味着按市场自己的定价，"
-                        f"到期时被打穿的概率约 {简洁数(round(d * 100))}%。")
-    为什么开.append(f"距到期还有 {天数} 天，每过一天时间价值都往我这边走。")
+        为什么开.append(f"No directional bet. This position wins on time: it only needs {标的} to stay "
+                        f"below {简洁数(卖认购['行权价'])} through {到期中文}. If it does break out, the "
+                        f"higher-strike long call caps how far the loss can go.")
+        为什么开.append(f"The short leg carries about {简洁数(round(d, 2))} delta, so by the market's own "
+                        f"pricing it finishes in the money roughly {简洁数(round(d * 100))}% of the time.")
+    为什么开.append(f"{天数} days to expiry: every day that passes moves time value my way.")
 
     if 结构 == "铁鹰":
-        什么会证明我错 = (f"{标的} 在到期前跌破 {盈亏平衡下沿:.2f} 或涨过 {盈亏平衡上沿:.2f}。"
-                        f"真跌穿的话，最多亏 {最大亏损美元:,.2f} 美元——这个数在下单之前就是定死的。")
+        什么会证明我错 = (f"{标的} closing below {盈亏平衡下沿:.2f} or above {盈亏平衡上沿:.2f} before "
+                        f"expiry is what proves me wrong. If it really breaks through, the most this "
+                        f"loses is ${最大亏损美元:,.2f} — and that number is fixed before the order exists.")
     elif 结构 == "看跌信用价差":
-        什么会证明我错 = (f"{标的} 在到期前跌破 {盈亏平衡下沿:.2f}。真跌穿的话，"
-                        f"最多亏 {最大亏损美元:,.2f} 美元——这个数在下单之前就是定死的。")
+        什么会证明我错 = (f"{标的} closing below {盈亏平衡下沿:.2f} before expiry is what proves me wrong. "
+                        f"If it really breaks down, the most this loses is ${最大亏损美元:,.2f} — and that "
+                        f"number is fixed before the order exists.")
     else:
-        什么会证明我错 = (f"{标的} 在到期前涨过 {盈亏平衡上沿:.2f}。真涨穿的话，"
-                        f"最多亏 {最大亏损美元:,.2f} 美元——这个数在下单之前就是定死的。")
+        什么会证明我错 = (f"{标的} closing above {盈亏平衡上沿:.2f} before expiry is what proves me wrong. "
+                        f"If it really breaks out, the most this loses is ${最大亏损美元:,.2f} — and that "
+                        f"number is fixed before the order exists.")
     一半 = round(净收权美元 / 2, 2)
-    打算怎么退出 = (f"赚到净收权的一半（{简洁数(一半)} 美元）就平掉；"
-                  f"到期日当天还没到目标就平掉，不留到收盘。")
+    打算怎么退出 = (f"Close once half the credit is earned (${简洁数(一半)}). If the target has not been "
+                  f"hit by expiry day, close anyway — nothing is carried into the close.")
 
-    类型中文表 = {"P": "认沽（跌破才亏）", "C": "认购（涨过才亏）"}
+    类型中文表 = {"P": "put (loses if price falls through)", "C": "call (loses if price rises through)"}
     腿明细 = [{"合约": 腿["合约"],
-               "做什么": "卖出" if 方向 == "sell" else "买入",
+               "做什么": "sell" if 方向 == "sell" else "buy",
                "行权价": 腿["行权价"],
                "类型中文": 类型中文表[腿["类型"]],
                "买价": 腿["买价"], "卖价": 腿["卖价"], "中价": 腿["中价"]}
