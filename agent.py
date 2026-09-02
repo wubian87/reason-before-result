@@ -57,10 +57,17 @@ def 钱样(值):
 
 
 def 带号(值):
-    """盈亏的排版：正数带加号、两位小数。"""
+    """盈亏的排版：带正负号、两位小数。"""
     if 值 is None:
-        return "—"
-    return ("+" if 值 >= 0 else "") + f"{值:,.2f}"
+        return "-"
+    return ("+" if 值 >= 0 else "-") + f"{abs(值):,.2f}"
+
+
+def 带号钱(值):
+    """盈亏的排版，带美元符号：+$54.00 / -$4.00。"""
+    if 值 is None:
+        return "-"
+    return ("+$" if 值 >= 0 else "-$") + f"{abs(值):,.2f}"
 
 
 def 简洁数(值):
@@ -288,7 +295,7 @@ def 跑看(参):
     线()
     print(f"  Account         {账号打码(账号)}")
     print(f"  Equity          ${钱样(权益)}")
-    print(f"  P&L today       {带号(当日)}")
+    print(f"  P&L today       {带号钱(当日)}")
     线("-")
     print("  O P T I O N S   P O S I T I O N S")
     期权持仓们 = [p for p in (持仓们 or []) if 取键(p, "asset_class", "assetClass") == "us_option"]
@@ -305,13 +312,13 @@ def 跑看(参):
         现价 = 浮(取键(持仓, "current_price", "currentPrice"))
         浮盈 = 浮(取键(持仓, "unrealized_pl", "unrealizedPl"))
         print(f"    {合约:<20} {做什么} {简洁数(abs(张)) if 张 is not None else '?'}   "
-              f"last {钱样(现价)}   unrealised {带号(浮盈)}")
+              f"last {钱样(现价)}   unrealised {带号钱(浮盈)}")
     线("-")
     print("  I T   S T O P S   W H E N   I T   L O S E S")
     上限 = 权益 * 0.02 if 权益 is not None else None
     止损 = -权益 * 0.03 if 权益 is not None else None
     print(f"    Per-order ceiling  ${钱样(上限)}   (2% of equity)")
-    print(f"    Daily stop         {钱样(止损)}   (3% of equity) - past it, closes only")
+    print(f"    Daily stop         -${钱样(abs(止损))}   (3% of equity) - past it, closes only")
     拦, 放, 演习 = 从账本数闸(账本, 今天)
     print(f"    Stopped today      {拦}")
     print(f"    Released today     {放}")
