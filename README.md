@@ -7,6 +7,8 @@ receipt is appended to a local ledger.
 
 > Paper trading only. No real capital. This project is not investment advice.
 
+**[Two-minute demo video](https://youtu.be/6-u2ReXTkh4)** · **[Live demo](https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/)**
+
 ## What judges can verify
 
 - A dedicated Alpaca paper account, supplied privately in the official form.
@@ -75,6 +77,24 @@ python agent.py open --dry-run
 When the market is open, `python agent.py open` may send a **paper** order only after
 the written judgment and all seven rule receipts have already been appended.
 
+### Running it unattended
+
+`一轮.sh` is one round — close, open at most once a day, recap — and it is what a
+`systemd` user timer fires every 30 minutes:
+
+```ini
+# ~/.config/systemd/user/alpaca-agent.timer
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+```
+
+The script gates itself twice, and both gates come from something that actually went
+wrong. It does nothing outside 09:35-15:55 US Eastern on a weekday, because closing a
+position while the market is shut returns `422 options market orders are only allowed
+during market hours` — noise, not signal. And it opens at most one round per US trading
+day, marked by a dated file, so a restarted timer cannot stack positions; the count
+itself is still the gate's job, not the script's.
+
 For a recording-safe proof that MCP is in the loop, enable the optional trace.
 It prints only MCP tool names, success state, and elapsed time—never parameters,
 keys, account IDs, or response bodies.
@@ -117,6 +137,7 @@ python delivery/freeze_evidence.py
 | `gate_selftest.py` | Ten deterministic gate cases |
 | `broker_selftest.py` | Ledger and client static / persistence checks |
 | `app.py` | Credential-free public page: one real receipt, plus a live gate to push on |
+| `一轮.sh` | One scheduled round: close, open once a day, recap — self-gated to US market hours |
 | `delivery/freeze_evidence.py` | Freezes a redacted evidence snapshot out of the ledger into `delivery/evidence.json` |
 
 Runtime ledgers, logs, account identifiers, participant data, credentials, and
