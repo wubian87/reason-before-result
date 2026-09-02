@@ -5,7 +5,7 @@
     看     给不懂的人看 15 秒的那一屏：权益、持仓、止损线
     演闸   三笔写死的假提案过闸，留账面证据（休市也能做）
     开     一轮完整动作：时钟→账户→现价→链→挑组合→落纸→过闸→（可选）下单
-    平     平掉到期或已赚到一半权利金的持仓
+    close  close positions that expired or already earned half the credit
     复盘   把当天账本渲染成 Markdown 日志，写进 <根>/日志/
 
 全局可选参数（放在子命令前面）：
@@ -559,17 +559,17 @@ def 跑平(参):
                 理由 = None
                 if 头 is not None and 头["到期"] == 今天:
                     # 到期日就是今天：不留到收盘，直接平
-                    理由 = "今天就是到期日，不留到收盘"
+                    理由 = "expiry day - nothing is carried into the close"
                 elif 浮盈 is None or 成本 is None or 成本 == 0:
                     # 找不到判断依据的持仓不许乱平
                     print(f"  {合约:<20} skipped: cannot work out whether to close")
                     continue
                 elif 浮盈 >= 0.5 * abs(成本):
-                    理由 = (f"浮盈 {带号(浮盈)} 美元，已到成本 {钱样(abs(成本))} 美元的一半"
-                            f"（{钱样(0.5 * abs(成本))} 美元）")
+                    理由 = (f"unrealised {带号钱(浮盈)}, which is half the ${钱样(abs(成本))} "
+                            f"cost basis (${钱样(0.5 * abs(成本))})")
                 else:
-                    print(f"  {合约:<20} holding: unrealised {带号(浮盈)}, short of the "
-                          f"一半（{钱样(0.5 * abs(成本))} 美元），继续拿着")
+                    print(f"  {合约:<20} holding: unrealised {带号钱(浮盈)}, short of the "
+                          f"${钱样(0.5 * abs(成本))} half-credit target")
                     continue
                 编号 = 账本.发号("P")
                 账本.记("下单", {"用途": "平仓", "合约": 合约, "理由": 理由, "幂等键": 编号}, 编号)
