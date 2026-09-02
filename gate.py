@@ -28,9 +28,18 @@ __all__ = ["默认配置", "过闸"]  # 对外只有这两样东西
 
 _合约乘数 = 100  # 一组期权合约对应 100 股
 _两腿价差白名单 = ("看跌信用价差", "看涨信用价差", "看跌借记价差", "看涨借记价差")
+# 结构的内部名是中文（账本里的历史值，⛔ 不动）；对外一律用下面这张表。
+_结构英文 = {"看跌信用价差": "put credit spread", "看涨信用价差": "call credit spread",
+            "看跌借记价差": "put debit spread", "看涨借记价差": "call debit spread",
+            "铁鹰": "iron condor"}
+
+
+def _英(结构):
+    return _结构英文.get(结构, str(结构))
 _铁鹰名 = "铁鹰"
-_七条规则名 = ("只许模拟盘", "风险必须定义得出来", "单笔上限", "当日止损",
-              "报价必须是活的", "到期日窗口", "仓位数上限")
+_七条规则名 = ("Paper account only", "Loss must be capped by the structure",
+              "Per-order ceiling", "Daily stop", "Every leg needs a live quote",
+              "Expiry window", "Open-position cap")
 
 
 class _算不出错(ValueError):
@@ -47,6 +56,12 @@ def _通俗数字(值):
     return f"{数:.2f}".rstrip("0").rstrip(".")
 
 
+def _钱(值):
+    """把金额写成 $12.30 / -$12.30，负号在美元符号外面。"""
+    数 = float(值)
+    return ("-$" if 数 < 0 else "$") + _通俗数字(abs(数))
+
+
 def _百分比(比例):
     """0.02 -> "2%"，0.35 -> "35%"。"""
     return _通俗数字(round(float(比例) * 100, 6)) + "%"
@@ -54,23 +69,23 @@ def _百分比(比例):
 
 def _取数(值, 名):
     if isinstance(值, bool) or not isinstance(值, (int, float)):
-        raise _算不出错(f"{名}必须是数字，实际是 {值!r}")
+        raise _算不出错(f"{名} must be a number; got {值!r}")
     return float(值)
 
 
 def _取正整数(值, 名):
     if isinstance(值, bool) or not isinstance(值, int) or 值 <= 0:
-        raise _算不出错(f"{名}必须是正整数，实际是 {值!r}")
+        raise _算不出错(f"{名} must be a positive integer; got {值!r}")
     return 值
 
 
 def _解析日期(文本, 名):
     if not isinstance(文本, str):
-        raise _算不出错(f"{名}必须是 YYYY-MM-DD 字符串，实际是 {文本!r}")
+        raise _算不出错(f"{名} must be a YYYY-MM-DD string; got {文本!r}")
     try:
         return _日期时间.strptime(文本, "%Y-%m-%d").date()
     except ValueError:
-        raise _算不出错(f"{名}「{文本}」不是 YYYY-MM-DD 格式，解析失败") from None
+        raise _算不出错(f"{名} {文本!r} is not a YYYY-MM-DD date") from None
 
 
 def _合并配置(传入):
@@ -101,54 +116,55 @@ def _裸卖补语(腿表):
                 无保护卖出.append(str(腿.get("合约")))
     if not 无保护卖出:
         return ""
-    return "；卖出的 " + "、".join(无保护卖出) + " 没有同到期同类型的买入腿保护（裸卖）"
+    return (" - sold " + ", ".join(无保护卖出)
+            + " with no bought leg of the same type and expiry behind it (naked short)")
 
 
 def _单方向腿(同类型腿表, 方向, 名):
     匹配 = [腿 for 腿 in 同类型腿表 if 腿.get("方向") == 方向]
     if len(匹配) != 1:
-        raise ValueError(f"{名}必须一买一卖，其中「{方向}」腿有 {len(匹配)} 条")
+        raise ValueError(f"{名} needs exactly one bought and one sold leg; this order has {len(匹配)} on the {方向} side")
     return 匹配[0]
 
 
 def _验两腿价差(结构, 腿表):
     """四种两腿价差共用的结构核验，通过就返回宽度（行权价之差）。"""
     if len(腿表) != 2:
-        raise ValueError(f"{结构}要正好 2 条腿，本单有 {len(腿表)} 条")
+        raise ValueError(f"a {_英(结构)} needs exactly 2 legs; this order has {len(腿表)}")
     for 腿 in 腿表:
         if 腿.get("比例") != 1:
-            raise ValueError(f"{结构}每条腿的比例必须是 1，本单有比例是 {腿.get('比例')!r} 的腿")
+            raise ValueError(f"every leg of a {_英(结构)} must have ratio 1; this order has a leg with ratio {腿.get('比例')!r}")
     两方向 = sorted(str(腿.get("方向")) for 腿 in 腿表)
     if 两方向 != ["buy", "sell"]:
-        raise ValueError(f"{结构}两条腿必须一买一卖，本单方向是 {两方向[0]!r} 和 {两方向[1]!r}")
+        raise ValueError(f"a {_英(结构)} must be one bought and one sold leg; this order has {两方向[0]!r} and {两方向[1]!r}")
     到期一, 到期二 = 腿表[0].get("到期"), 腿表[1].get("到期")
     if 到期一 != 到期二:
-        raise ValueError(f"{结构}两条腿到期日不一样（{到期一} 对 {到期二}）")
+        raise ValueError(f"the two legs of this {_英(结构)} expire on different days ({到期一} vs {到期二})")
     类型一, 类型二 = 腿表[0].get("类型"), 腿表[1].get("类型")
     if 类型一 not in ("C", "P") or 类型一 != 类型二:
-        raise ValueError(f"{结构}两条腿必须是同一种类型（都是 C 或都是 P），本单是 {类型一!r} 对 {类型二!r}")
+        raise ValueError(f"both legs of a {_英(结构)} must be the same type (both C or both P); this order has {类型一!r} and {类型二!r}")
     行权一 = _取数(腿表[0].get("行权价"), "第一条腿的行权价")
     行权二 = _取数(腿表[1].get("行权价"), "第二条腿的行权价")
     if 行权一 == 行权二:
-        raise ValueError(f"{结构}两条腿行权价相等（都是 {_通俗数字(行权一)} 美元），定不出宽度")
+        raise ValueError(f"both legs of this {_英(结构)} share strike {_通俗数字(行权一)}, so the width is undefined")
     return abs(行权一 - 行权二)
 
 
 def _验铁鹰(腿表):
     """铁鹰的结构核验，通过就返回宽度（两对宽度里的最大值）。"""
     if len(腿表) != 4:
-        raise ValueError(f"铁鹰要正好 4 条腿，本单有 {len(腿表)} 条")
+        raise ValueError(f"an iron condor needs exactly 4 legs; this order has {len(腿表)}")
     for 腿 in 腿表:
         if 腿.get("比例") != 1:
-            raise ValueError(f"铁鹰每条腿的比例必须是 1，本单有比例是 {腿.get('比例')!r} 的腿")
+            raise ValueError(f"every leg of an iron condor must have ratio 1; this order has a leg with ratio {腿.get('比例')!r}")
     到期集合 = {腿.get("到期") for 腿 in 腿表}
     if len(到期集合) != 1:
-        raise ValueError("铁鹰 4 条腿必须同一天到期，本单到期分别是 "
+        raise ValueError("all 4 legs of an iron condor must expire on the same day; this order expires "
                          + "、".join(sorted(str(某) for 某 in 到期集合)))
     认沽腿 = [腿 for 腿 in 腿表 if 腿.get("类型") == "P"]
     认购腿 = [腿 for 腿 in 腿表 if 腿.get("类型") == "C"]
     if len(认沽腿) != 2 or len(认购腿) != 2:
-        raise ValueError(f"铁鹰要 2 条认沽（P）加 2 条认购（C），本单是 {len(认沽腿)} 条 P 对 {len(认购腿)} 条 C")
+        raise ValueError(f"an iron condor needs 2 puts and 2 calls; this order has {len(认沽腿)} P and {len(认购腿)} C")
     认沽买 = _单方向腿(认沽腿, "buy", "铁鹰的认沽一对")
     认沽卖 = _单方向腿(认沽腿, "sell", "铁鹰的认沽一对")
     认购买 = _单方向腿(认购腿, "buy", "铁鹰的认购一对")
@@ -158,9 +174,9 @@ def _验铁鹰(腿表):
     认购买价 = _取数(认购买.get("行权价"), "铁鹰认购买腿的行权价")
     认购卖价 = _取数(认购卖.get("行权价"), "铁鹰认购卖腿的行权价")
     if not 认沽买价 < 认沽卖价:
-        raise ValueError(f"铁鹰认沽一对：买腿行权价必须低于卖腿（本单买 {_通俗数字(认沽买价)} 对卖 {_通俗数字(认沽卖价)}）")
+        raise ValueError(f"iron condor put side: the bought strike must sit below the sold one (bought {_通俗数字(认沽买价)} vs sold {_通俗数字(认沽卖价)})")
     if not 认购买价 > 认购卖价:
-        raise ValueError(f"铁鹰认购一对：买腿行权价必须高于卖腿（本单买 {_通俗数字(认购买价)} 对卖 {_通俗数字(认购卖价)}）")
+        raise ValueError(f"iron condor call side: the bought strike must sit above the sold one (bought {_通俗数字(认购买价)} vs sold {_通俗数字(认购卖价)})")
     return max(abs(认沽买价 - 认沽卖价), abs(认购买价 - 认购卖价))
 
 
@@ -180,7 +196,7 @@ def _试算风险量(提案):
         净价 = _取数(提案.get("净价"), "提案里的净价")
     except _算不出错 as 错:
         试算["算不出"] = True
-        试算["G2拦"] = f"{错}，定不出净收权和最大亏损"
+        试算["G2拦"] = f"{错}; the credit and the maximum loss cannot be worked out"
         return 试算
     净收权 = -净价 * _合约乘数 * 张数
     试算["张数"] = 张数
@@ -188,7 +204,7 @@ def _试算风险量(提案):
 
     腿表 = 提案.get("腿")
     if not isinstance(腿表, list) or not 腿表:
-        试算["G2拦"] = "提案里没有有效的腿列表，结构定不出来"
+        试算["G2拦"] = "the proposal has no usable list of legs, so the structure is undefined"
         return 试算
     结构 = 提案.get("结构")
     try:
@@ -197,17 +213,17 @@ def _试算风险量(提案):
         elif 结构 == _铁鹰名:
             宽度 = _验铁鹰(腿表)
         else:
-            raise ValueError(f"结构「{结构}」不在白名单里（只许：看跌/看涨信用价差、看跌/看涨借记价差、铁鹰）")
+            raise ValueError(f"structure {结构!r} is not on the allow-list (put/call credit spread, put/call debit spread, iron condor)")
     except _算不出错 as 错:
         试算["算不出"] = True
         试算["G2拦"] = str(错)
         return 试算
     except ValueError as 错:
-        试算["G2拦"] = f"{错}{_裸卖补语(腿表)}。"
+        试算["G2拦"] = f"{错}{_裸卖补语(腿表)}."
         return 试算
     except Exception as 错:
         试算["算不出"] = True
-        试算["G2拦"] = f"结构核验时出了错：{错}"
+        试算["G2拦"] = f"the structure check itself failed: {错}"
         return 试算
 
     宽度总额 = 宽度 * _合约乘数 * 张数
@@ -218,9 +234,10 @@ def _试算风险量(提案):
         最大亏损 = -净收权
         最大盈利 = 宽度总额 + 净收权
     if not (最大亏损 > 0 and 净收权 < 宽度总额):
-        试算["G2拦"] = (f"报价不合常理：净收权 {_通俗数字(净收权)} 美元，"
-                        f"宽度 {_通俗数字(宽度)} 美元 × {张数} 张 = {_通俗数字(宽度总额)} 美元，"
-                        f"算出最大亏损 {_通俗数字(最大亏损)} 美元；要求最大亏损大于 0，且净收权小于宽度总额。")
+        试算["G2拦"] = (f"the quotes do not add up: credit ${_通俗数字(净收权)}, "
+                        f"width ${_通俗数字(宽度)} x {张数} contract(s) = ${_通俗数字(宽度总额)}, "
+                        f"which puts the maximum loss at ${_通俗数字(最大亏损)}. It must be above 0, "
+                        f"and the credit must stay below the total width.")
         return 试算
     试算["宽度"] = 宽度
     试算["最大亏损"] = 最大亏损
@@ -233,8 +250,8 @@ def _试算风险量(提案):
 def _判G1(账户):
     """G1 只许模拟盘。"""
     if 账户.get("是模拟盘") is True:
-        return True, "账户标记为模拟盘。"
-    return False, "账户不是模拟盘；这个闸只放行模拟盘。"
+        return True, "The account is flagged as paper."
+    return False, "This is not a paper account. The gate only releases orders on paper."
 
 
 def _判G2(提案, 试算):
@@ -243,25 +260,25 @@ def _判G2(提案, 试算):
         if 试算["算不出"]:
             raise _算不出错(试算["G2拦"])
         return False, 试算["G2拦"]
-    return True, (f"{提案.get('结构')}结构核验通过：宽度 {_通俗数字(试算['宽度'])} 美元，"
-                  f"净收权 {_通俗数字(试算['净收权'])} 美元，"
-                  f"最大亏损 {_通俗数字(试算['最大亏损'])} 美元，"
-                  f"最大盈利 {_通俗数字(试算['最大盈利'])} 美元。")
+    return True, (f"{_英(提案.get('结构')).capitalize()} verified: width ${_通俗数字(试算['宽度'])}, "
+                  f"credit ${_通俗数字(试算['净收权'])}, "
+                  f"maximum loss ${_通俗数字(试算['最大亏损'])}, "
+                  f"maximum gain ${_通俗数字(试算['最大盈利'])}.")
 
 
 def _判G3(账户, 试算, 配置):
     """G3 单笔上限。"""
     if 试算["最大亏损"] is None:
-        raise _算不出错("最大亏损定不出来（先看 G2 为什么没过）")
+        raise _算不出错("the maximum loss is undefined - see why G2 failed first")
     权益 = _取数(账户.get("权益"), "账户里的权益")
     比例 = _取数(配置.get("单笔最大亏损占权益"), "配置里的单笔最大亏损占权益")
     上限 = 权益 * 比例
     亏损 = 试算["最大亏损"]
     if 亏损 <= 上限:
-        return True, (f"单笔最大亏损 {_通俗数字(亏损)} 美元，"
-                      f"在权益 {_百分比(比例)} 的上限 {_通俗数字(上限)} 美元以内。")
-    return False, (f"单笔最大亏损 {_通俗数字(亏损)} 美元，"
-                   f"超过权益 {_百分比(比例)} 的上限 {_通俗数字(上限)} 美元。")
+        return True, (f"Worst case ${_通俗数字(亏损)}, inside the "
+                      f"${_通俗数字(上限)} ceiling ({_百分比(比例)} of equity).")
+    return False, (f"Worst case ${_通俗数字(亏损)} is over the "
+                   f"${_通俗数字(上限)} ceiling ({_百分比(比例)} of equity).")
 
 
 def _判G4(账户, 配置):
@@ -271,17 +288,17 @@ def _判G4(账户, 配置):
     比例 = _取数(配置.get("当日止损占权益"), "配置里的当日止损占权益")
     止损线 = -权益 * 比例
     if 当日盈亏 > 止损线:
-        return True, (f"今日盈亏 {_通俗数字(当日盈亏)} 美元，"
-                      f"未触及 {_通俗数字(-止损线)} 美元的当日止损线。")
-    return False, (f"今天已亏 {_通俗数字(-当日盈亏)} 美元，"
-                   f"触及 {_通俗数字(-止损线)} 美元的当日止损线，只平不开。")
+        return True, (f"Today's P&L is {_钱(当日盈亏)}, nowhere near the "
+                      f"{_钱(-止损线)} daily stop.")
+    return False, (f"Down ${_通俗数字(-当日盈亏)} today, past the ${_通俗数字(-止损线)} "
+                   f"daily stop. From here it may only close, never open.")
 
 
 def _判G5(提案, 配置):
     """G5 报价必须是活的（fail-closed）。"""
     腿表 = 提案.get("腿")
     if not isinstance(腿表, list) or not 腿表:
-        raise _算不出错("提案里没有有效的腿列表")
+        raise _算不出错("the proposal has no usable list of legs")
     绝对上限 = _取数(配置.get("最大点差绝对值"), "配置里的最大点差绝对值")
     比例上限 = _取数(配置.get("最大点差占中价"), "配置里的最大点差占中价")
     问题 = []
@@ -290,16 +307,16 @@ def _判G5(提案, 配置):
         合约 = 腿.get("合约")
         买价, 卖价 = 腿.get("买价"), 腿.get("卖价")
         if 买价 is None or 卖价 is None:
-            缺哪个 = "买价、卖价都" if (买价 is None and 卖价 is None) else ("买价" if 买价 is None else "卖价")
-            问题.append(f"{合约} 的{缺哪个}是空的，报价不算活")
+            缺哪个 = "bid and ask are" if (买价 is None and 卖价 is None) else ("bid is" if 买价 is None else "ask is")
+            问题.append(f"{合约}: the {缺哪个} empty, so the quote is not live")
             continue
         买 = _取数(买价, f"{合约} 的买价")
         卖 = _取数(卖价, f"{合约} 的卖价")
         if 买 <= 0 or 卖 <= 0:
-            问题.append(f"{合约} 买价 {_通俗数字(买)}、卖价 {_通俗数字(卖)}，必须都大于 0")
+            问题.append(f"{合约}: bid {_通俗数字(买)} / ask {_通俗数字(卖)}; both must be above 0")
             continue
         if 卖 < 买:
-            问题.append(f"{合约} 卖价 {_通俗数字(卖)} 低于买价 {_通俗数字(买)}，报价倒挂")
+            问题.append(f"{合约}: ask {_通俗数字(卖)} is below bid {_通俗数字(买)}; the quote is crossed")
             continue
         点差 = 卖 - 买
         if 最宽点差 is None or 点差 > 最宽点差:
@@ -307,21 +324,22 @@ def _判G5(提案, 配置):
         中价 = (买 + 卖) / 2
         比例限额 = 中价 * 比例上限
         if 点差 > 绝对上限 and 点差 > 比例限额:
-            问题.append(f"{合约} 点差 {_通俗数字(点差)} 美元：既超过绝对上限 {_通俗数字(绝对上限)} 美元"
-                        f"（差 {_通俗数字(点差 - 绝对上限)} 美元），也超过中价 {_通俗数字(中价)} 美元的 "
-                        f"{_百分比(比例上限)} 比例上限 {_通俗数字(比例限额)} 美元"
-                        f"（差 {_通俗数字(点差 - 比例限额)} 美元）")
+            问题.append(f"{合约}: spread ${_通俗数字(点差)} is over both limits - the flat "
+                        f"${_通俗数字(绝对上限)} cap (by ${_通俗数字(点差 - 绝对上限)}) and "
+                        f"{_百分比(比例上限)} of the ${_通俗数字(中价)} mid, i.e. "
+                        f"${_通俗数字(比例限额)} (by ${_通俗数字(点差 - 比例限额)})")
     if 问题:
-        return False, "；".join(问题) + "。"
-    return True, (f"{len(腿表)} 条腿报价全部有效，最大点差 {_通俗数字(最宽点差)} 美元（{最宽合约}），"
-                  f"在绝对上限 {_通俗数字(绝对上限)} 美元与中价 {_百分比(比例上限)} 比例上限之内。")
+        return False, "; ".join(问题) + "."
+    return True, (f"All {len(腿表)} leg{' quotes' if len(腿表) == 1 else 's quote'} two-sided. Widest spread ${_通俗数字(最宽点差)} "
+                  f"({最宽合约}), inside both the ${_通俗数字(绝对上限)} flat cap and the "
+                  f"{_百分比(比例上限)}-of-mid cap.")
 
 
 def _判G6(提案, 时钟, 配置):
     """G6 到期日窗口。"""
     腿表 = 提案.get("腿")
     if not isinstance(腿表, list) or not 腿表:
-        raise _算不出错("提案里没有有效的腿列表")
+        raise _算不出错("the proposal has no usable list of legs")
     最短 = _取数(配置.get("最短到期天"), "配置里的最短到期天")
     最长 = _取数(配置.get("最长到期天"), "配置里的最长到期天")
     今天 = _解析日期(时钟.get("今天"), "时钟里的今天")
@@ -335,13 +353,13 @@ def _判G6(提案, 时钟, 配置):
             问题.append(str(错))
             continue
         天数 = (到期日 - 今天).days
-        概览.append(f"{到期} 距今天 {天数} 天")
+        概览.append(f"{到期} is {天数} day(s) out")
         if not (最短 <= 天数 <= 最长):
-            问题.append(f"{到期} 距今天 {天数} 天，不在 {_通俗数字(最短)} 至 {_通俗数字(最长)} 天的窗口内")
+            问题.append(f"{到期} is {天数} day(s) out, outside the {_通俗数字(最短)}-{_通俗数字(最长)} day window")
     if 问题:
-        return False, "；".join(dict.fromkeys(问题)) + "。"  # 同样的毛病只说一遍
-    return True, ("各腿 " + "、".join(dict.fromkeys(概览))
-                  + f"，都在 {_通俗数字(最短)} 至 {_通俗数字(最长)} 天窗口内。")
+        return False, "; ".join(dict.fromkeys(问题)) + "."  # 同样的毛病只说一遍
+    return True, ("Legs: " + ", ".join(dict.fromkeys(概览))
+                  + f" - all inside the {_通俗数字(最短)}-{_通俗数字(最长)} day window.")
 
 
 def _判G7(提案, 账户, 配置):
@@ -351,10 +369,10 @@ def _判G7(提案, 账户, 配置):
     上限 = _取数(配置.get("最多未平仓组数"), "配置里的最多未平仓组数")
     合计 = 已有 + 张数
     if 合计 <= 上限:
-        return True, (f"已有 {_通俗数字(已有)} 组未平仓，加本单 {张数} 组共 {_通俗数字(合计)} 组，"
-                      f"不超过 {_通俗数字(上限)} 组。")
-    return False, (f"已有 {_通俗数字(已有)} 组未平仓，加本单 {张数} 组共 {_通俗数字(合计)} 组，"
-                   f"超过最多 {_通俗数字(上限)} 组。")
+        return True, (f"{_通俗数字(已有)} open plus {张数} new = {_通俗数字(合计)} group(s), "
+                      f"within the cap of {_通俗数字(上限)}.")
+    return False, (f"{_通俗数字(已有)} open plus {张数} new = {_通俗数字(合计)} group(s), "
+                   f"over the cap of {_通俗数字(上限)}.")
 
 
 # ---------------- 汇总 ----------------
@@ -364,15 +382,16 @@ def _跑一条(编号, 名字, 判定函数):
     try:
         通过, 说明 = 判定函数()
     except Exception as 错:
-        return {"规则": 编号, "名": 名字, "过": False, "说明": f"算不出：{错}"}
+        return {"规则": 编号, "名": 名字, "过": False, "说明": f"Cannot be determined: {错}"}
     return {"规则": 编号, "名": 名字, "过": bool(通过), "说明": 说明}
 
 
 def _兜底拦():
     """连正文都没跑完时的最后防线：整单拦下，七条账目照样给全。"""
-    逐条 = [{"规则": f"G{序}", "名": 名, "过": False, "说明": "算不出：闸内部出错，默认拒绝。"}
+    逐条 = [{"规则": f"G{序}", "名": 名, "过": False,
+             "说明": "Cannot be determined: the gate itself errored, so the default is refuse."}
             for 序, 名 in enumerate(_七条规则名, start=1)]
-    return {"过": False, "一句话": "拦：闸内部出错，默认拒绝。",
+    return {"过": False, "一句话": "STOP: the gate itself errored, so the default is refuse.",
             "最大亏损": None, "最大盈利": None, "宽度": None, "净收权": None, "逐条": 逐条}
 
 
@@ -398,13 +417,12 @@ def _过闸正文(提案, 账户, 时钟, 配置参数):
 
     通过 = all(条目["过"] for 条目 in 逐条)
     if 通过:
-        一句话 = (f"过：{提案.get('结构')}核验通过，"
-                  f"最大亏损 {_通俗数字(试算['最大亏损'])} 美元、"
-                  f"最大盈利 {_通俗数字(试算['最大盈利'])} 美元、"
-                  f"净收权 {_通俗数字(试算['净收权'])} 美元，七条规则全部通过。")
+        一句话 = (f"RELEASED: {_英(提案.get('结构'))} verified - maximum loss "
+                  f"${_通俗数字(试算['最大亏损'])}, maximum gain ${_通俗数字(试算['最大盈利'])}, "
+                  f"credit ${_通俗数字(试算['净收权'])}. All seven rules pass.")
     else:
         首条未过 = next(条目 for 条目 in 逐条 if not 条目["过"])
-        一句话 = "拦：" + 首条未过["说明"]
+        一句话 = "STOP: " + 首条未过["说明"]
 
     return {
         "过": 通过,

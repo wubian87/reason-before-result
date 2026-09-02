@@ -77,6 +77,16 @@ def 线(符="=", 数=64):
     print(符 * 数)
 
 
+# 过闸摘要里那几个键，对外用英文
+_钱名 = {"最大亏损": "Maximum loss", "最大盈利": "Maximum gain",
+        "宽度": "Width", "净收权": "Credit"}
+
+# 结构的内部名是中文（账本历史值，⛔ 不动）；打印一律走这张表
+_结构英文 = {"看跌信用价差": "put credit spread", "看涨信用价差": "call credit spread",
+            "看跌借记价差": "put debit spread", "看涨借记价差": "call debit spread",
+            "铁鹰": "iron condor"}
+
+
 def 账号打码(账号):
     """账户号打码显示：前两位 + … + 后两位（模拟盘账号也不大意）。"""
     账号 = str(账号 or "")
@@ -133,67 +143,68 @@ def 打印闸表(标题, 闸判, 提案=None):
     print()
     print(f"  {标题}")
     if isinstance(提案, dict):
-        print(f"  提案：{提案.get('结构')}，{提案.get('张数')} 张，净价 {提案.get('净价')} 美元，"
-              f"{len(提案.get('腿') or [])} 条腿，标的现价 {提案.get('标的现价')}")
+        print(f"  Proposal: {_结构英文.get(提案.get('结构'), 提案.get('结构'))}, "
+              f"{提案.get('张数')} contract(s), net {提案.get('净价')}, "
+              f"{len(提案.get('腿') or [])} legs, underlying last {提案.get('标的现价')}")
     过 = 取键(闸判, "过")
-    print(f"  过闸结果：{'✅ 放行' if 过 is True else '⛔ 拦下'} —— {取键(闸判, '一句话') or '（没给一句话）'}")
+    print(f"  Gate: {取键(闸判, '一句话') or ('RELEASED' if 过 is True else 'STOPPED')}")
     逐条 = 取键(闸判, "逐条") or []
     if 逐条:
-        print(f"    {'规则':<6}{'名字':<22}{'结果':<7}说明")
+        print(f"    {'RULE':<6}{'NAME':<38}{'VERDICT':<9}WHY")
         print("    " + "-" * 56)
         for 条 in 逐条:
             if not isinstance(条, dict):
                 continue
             这过 = 取键(条, "过")
-            标记 = "✅ 过" if 这过 is True else "⛔ 拦"
-            print(f"    {str(取键(条, '规则') or ''):<6}{str(取键(条, '名') or ''):<22}"
-                  f"{标记:<7}{取键(条, '说明') or ''}")
+            标记 = "PASS" if 这过 is True else "STOP"
+            print(f"    {str(取键(条, '规则') or ''):<6}{str(取键(条, '名') or ''):<38}"
+                  f"{标记:<9}{取键(条, '说明') or ''}")
     for 键 in ("最大亏损", "最大盈利", "宽度", "净收权"):
         值 = 取键(闸判, 键)
         if 值 is not None:
-            print(f"    {键}：{简洁数(值)}")
+            print(f"    {_钱名.get(键, 键)}: {简洁数(值)}")
 
 
 def 打印判断书(书, 编号=None):
     """把判断书整屏打出来，给录屏用。"""
     线()
-    print("  判 断 书" + (f"（编号 {编号}）" if 编号 else ""))
+    print("  W R I T T E N   J U D G M E N T" + (f"   ({编号})" if 编号 else ""))
     线()
-    print(f"  标的 {书.get('标的')}    现价 {书.get('标的现价')}    今天 {书.get('今天')}")
-    print(f"  结论：{书.get('结论')}")
+    print(f"  Underlying {书.get('标的')}    last {书.get('标的现价')}    date {书.get('今天')}")
+    print(f"  Decision: {'OPEN' if 书.get('结论') == '开' else 书.get('结论')}")
     if 书.get("结构中文"):
-        print(f"  结构：{书['结构中文']}")
+        print(f"  Structure: {书['结构中文']}")
     为什么 = 书.get("为什么开") or []
     if 为什么:
         print()
-        print("  为什么开：")
+        print("  Why:")
         for 句 in 为什么:
             print(f"    · {句}")
     腿明细 = 书.get("腿明细") or []
     if 腿明细:
         print()
-        print("  腿明细：")
-        print(f"    {'合约':<20}{'做什么':<5}{'行权价':>7}  {'类型':<14}{'买价':>7}{'卖价':>7}{'中价':>7}")
+        print("  Legs:")
+        print(f"    {'CONTRACT':<20}{'SIDE':<6}{'STRIKE':>7}  {'TYPE':<36}{'BID':>7}{'ASK':>7}{'MID':>7}")
         for 腿 in 腿明细:
             print(f"    {str(腿.get('合约', '')):<20}{str(腿.get('做什么', '')):<5}"
                   f"{简洁数(腿.get('行权价')):>7}  {str(腿.get('类型中文', '')):<14}"
                   f"{简洁数(腿.get('买价')):>7}{简洁数(腿.get('卖价')):>7}{简洁数(腿.get('中价')):>7}")
     钱 = 书.get("钱") or {}
     print()
-    print("  钱：")
-    print(f"    净收权      {钱样(钱.get('净收权美元'))} 美元")
-    print(f"    最大盈利    {钱样(钱.get('最大盈利美元'))} 美元")
-    print(f"    最大亏损    {钱样(钱.get('最大亏损美元'))} 美元（下单前就定死）")
-    print(f"    盈亏平衡    下沿 {钱样(钱.get('盈亏平衡下沿'))} ／ 上沿 {钱样(钱.get('盈亏平衡上沿'))}")
-    print(f"    宽度 {钱样(钱.get('宽度'))} 美元    张数 {简洁数(钱.get('张数'))}")
+    print("  Money:")
+    print(f"    Credit taken in   ${钱样(钱.get('净收权美元'))}")
+    print(f"    Maximum gain      ${钱样(钱.get('最大盈利美元'))}")
+    print(f"    Maximum loss      ${钱样(钱.get('最大亏损美元'))}  (fixed before the order exists)")
+    print(f"    Break-evens       {钱样(钱.get('盈亏平衡下沿'))} / {钱样(钱.get('盈亏平衡上沿'))}")
+    print(f"    Width ${钱样(钱.get('宽度'))}    contracts {简洁数(钱.get('张数'))}")
     if 书.get("什么会证明我错"):
         print()
-        print(f"  什么会证明我错：{书['什么会证明我错']}")
+        print(f"  What would prove it wrong: {书['什么会证明我错']}")
     if 书.get("打算怎么退出"):
-        print(f"  打算怎么退出：{书['打算怎么退出']}")
+        print(f"  Planned exit: {书['打算怎么退出']}")
     if 书.get("不开的理由"):
         print()
-        print(f"  不开的理由：{书['不开的理由']}")
+        print(f"  Why it is not opening: {书['不开的理由']}")
     线()
 
 
@@ -202,29 +213,29 @@ def 打印判断书(书, 编号=None):
 def 跑体检(参):
     红 = []
     线()
-    print("  体 检 —— 先查本地，再连一次网")
+    print("  P R E F L I G H T   -   local checks first, then one live round-trip")
     线()
-    print("  【一 · 不联网】")
+    print("  [1 - offline]")
     模块们在 = {}
     for 名 in ("gate", "broker", "ledger", "strategy"):
         try:
             引入(名)
             模块们在[名] = True
-            print(f"  ✅ 模块 {名}.py 能加载")
+            print(f"  OK   module {名}.py imports")
         except Exception as 错:
             模块们在[名] = False
-            print(f"  ⛔ 模块 {名}.py 加载失败：{错}")
+            print(f"  FAIL module {名}.py: {错}")
             红.append(f"{名}.py 加载失败")
     密钥文件 = os.path.join(参.根, ".env")
     # 只查在不在，不打开、不读内容、不打印内容
     if os.path.isfile(密钥文件):
-        print("  ✅ 密钥文件 .env 存在（只查在不在，不读内容）")
+        print("  OK   .env is present (existence only - it is never opened here)")
     else:
-        print("  ⛔ 密钥文件 .env 不存在（要放在项目根下，名字就叫 .env）")
+        print("  FAIL .env is missing (it belongs in the project root, named exactly .env)")
         红.append(".env 不存在")
-    print("  【二 · 联机】")
+    print("  [2 - live]")
     if not (模块们在.get("broker") and 模块们在.get("ledger")):
-        print("  ⛔ broker.py / ledger.py 没加载成，联机部分跳过")
+        print("  FAIL broker.py / ledger.py did not import; skipping the live half")
         红.append("联机部分没做成")
     else:
         try:
@@ -235,21 +246,21 @@ def 跑体检(参):
                 时钟原始 = 手柄.时钟()
                 账户原始 = 手柄.账户()
             开市 = 取键(时钟原始, "is_open", "isOpen")
-            print(f"  {'·' if not 开市 else '✅'} 现在{'开市中' if 开市 else '休市'}")
-            print(f"    下次开市时间　{取键(时钟原始, 'next_open', 'nextOpen') or '—'}")
-            print(f"    账户状态　　　{取键(账户原始, 'status') or '—'}")
-            print(f"    权益　　　　　{钱样(浮(取键(账户原始, 'equity')))} 美元")
+            print(f"  {'·' if not 开市 else 'OK  '} the market is {'open' if 开市 else 'closed'}")
+            print(f"    next open      {取键(时钟原始, 'next_open', 'nextOpen') or '-'}")
+            print(f"    account status {取键(账户原始, 'status') or '-'}")
+            print(f"    equity         ${钱样(浮(取键(账户原始, 'equity')))}")
             账号 = 取键(账户原始, "account_number", "accountNumber")
             模拟 = isinstance(账号, str) and 账号.startswith("PA")
-            print(f"    是不是模拟盘　{'是（账户号以 PA 开头）' if 模拟 else '不是！账户号不以 PA 开头，当心是真钱'}")
+            print(f"    paper account  {'YES - the account number starts with PA' if 模拟 else 'NO! this account number does not start with PA - real money may be at risk'}")
         except Exception as 错:
-            print(f"  ⛔ 联机部分失败：{type(错).__name__}: {错}")
+            print(f"  FAIL the live half: {type(错).__name__}: {错}")
             红.append("联机部分失败")
     线()
     if 红:
-        print(f"⛔ 体检有红：{'；'.join(红)}")
+        print(f"PREFLIGHT FAILED: {'; '.join(红)}")
         return 1
-    print("✅ 体检全绿")
+    print("PREFLIGHT GREEN")
     return 0
 
 
@@ -271,41 +282,41 @@ def 跑看(参):
 
     线()
     if 模拟:
-        print("  模 拟 盘 · PAPER  ——  没有真钱，一分钱都不是真的")
+        print("  P A P E R   A C C O U N T   -   no real money, not one cent of it")
     else:
-        print("  ⚠ 实 盘 · LIVE  ——  这是真钱！每一笔都是真的！")
+        print("  !! L I V E   A C C O U N T   -   this is real money !!")
     线()
-    print(f"  账户            {账号打码(账号)}")
-    print(f"  权益            {钱样(权益)} 美元")
-    print(f"  今天盈亏        {钱样(当日)} 美元")
+    print(f"  Account         {账号打码(账号)}")
+    print(f"  Equity          ${钱样(权益)}")
+    print(f"  P&L today       {带号(当日)}")
     线("-")
-    print("  期 权 持 仓（OPTIONS）")
+    print("  O P T I O N S   P O S I T I O N S")
     期权持仓们 = [p for p in (持仓们 or []) if 取键(p, "asset_class", "assetClass") == "us_option"]
     if not 期权持仓们:
-        print("    今天还没有持仓")
+        print("    nothing open")
     for 持仓 in 期权持仓们:
         合约 = str(取键(持仓, "symbol") or "?")
         方向 = 取键(持仓, "side")
         张 = 浮(取键(持仓, "qty"))
         if 方向 == "short" or (方向 is None and 张 is not None and 张 < 0):
-            做什么 = "卖出"
+            做什么 = "short"
         else:
-            做什么 = "买入"
+            做什么 = "long "
         现价 = 浮(取键(持仓, "current_price", "currentPrice"))
         浮盈 = 浮(取键(持仓, "unrealized_pl", "unrealizedPl"))
-        print(f"    {合约:<20} {做什么} {简洁数(abs(张)) if 张 is not None else '?'} 张   "
-              f"现价 {钱样(现价)}   浮盈 {带号(浮盈)}")
+        print(f"    {合约:<20} {做什么} {简洁数(abs(张)) if 张 is not None else '?'}   "
+              f"last {钱样(现价)}   unrealised {带号(浮盈)}")
     线("-")
-    print("  亏 了 会 停")
+    print("  I T   S T O P S   W H E N   I T   L O S E S")
     上限 = 权益 * 0.02 if 权益 is not None else None
     止损 = -权益 * 0.03 if 权益 is not None else None
-    print(f"    单笔最大亏损上限   {钱样(上限)} 美元（权益的 2%）")
-    print(f"    当日止损线         {钱样(止损)} 美元（权益的 3%）——碰线只平不开")
+    print(f"    Per-order ceiling  ${钱样(上限)}   (2% of equity)")
+    print(f"    Daily stop         {钱样(止损)}   (3% of equity) - past it, closes only")
     拦, 放, 演习 = 从账本数闸(账本, 今天)
-    print(f"    今天闸拦下         {拦} 笔")
-    print(f"    今天闸放行         {放} 笔")
+    print(f"    Stopped today      {拦}")
+    print(f"    Released today     {放}")
     if 演习:
-        print(f"    （另有演习 {演习} 笔，不计入上两行）")
+        print(f"    ({演习} rehearsal run(s), not counted above)")
     线()
     return 0
 
@@ -364,32 +375,33 @@ def 跑演闸(参):
               "未平仓组数": 0, "期权购买力": 100000.0}
     假时钟 = {"今天": 今天, "开市中": True}
     演习们 = [
-        ("裸卖一条认沽（只有卖出腿，没有保护腿）", 造裸卖认沽提案(账本, 到期日)),
-        ("宽度 50 美元、最大亏损约占权益 12% 的价差", 造太宽价差提案(账本, 到期日)),
-        ("有一条腿报价缺失（买价是空的）", 造缺报价提案(账本, 到期日)),
+        ("a naked short put - one sold leg, nothing bought behind it", 造裸卖认沽提案(账本, 到期日)),
+        ("a $50-wide spread whose worst case is about 12% of equity", 造太宽价差提案(账本, 到期日)),
+        ("a leg with no bid at all", 造缺报价提案(账本, 到期日)),
     ]
     线()
-    print("  演 闸 —— 三笔写死的假提案，看闸拦不拦（休市也能做）")
+    print("  R E H E A R S A L   -   three deliberately bad proposals (works when shut)")
     线()
     栽在哪 = []
     全部拦下 = True
     for 序, (说明, 提案) in enumerate(演习们, 1):
         闸判 = 闸.过闸(提案, 假账户, 假时钟)
         账本.记("闸", {"演习": True, "提案": 提案, "结果": 闸判}, 提案["编号"])
-        打印闸表(f"演习 {序}／3：{说明}（编号 {提案['编号']}）", 闸判, 提案)
+        打印闸表(f"Rehearsal {序}/3: {说明}   ({提案['编号']})", 闸判, 提案)
         逐条 = 取键(闸判, "逐条") or []
         首拦 = next((条 for 条 in 逐条 if isinstance(条, dict) and 取键(条, "过") is False), None)
         if 首拦 is not None:
-            栽在哪.append(f"第 {序} 笔 栽在 {取键(首拦, '规则')} {取键(首拦, '名')}")
+            栽在哪.append(f"#{序} stopped at {取键(首拦, '规则')} {取键(首拦, '名')}")
         elif 取键(闸判, "过") is True:
             全部拦下 = False
-            栽在哪.append(f"第 {序} 笔 居然被放行了（这不该发生，请查闸）")
+            栽在哪.append(f"#{序} WAS RELEASED - this must not happen; check the gate")
         else:
             全部拦下 = False
-            栽在哪.append(f"第 {序} 笔 没拿到逐条明细，说不上栽在哪")
+            栽在哪.append(f"#{序} returned no per-rule receipts, so where it stopped is unknown")
     线()
-    print("  演 闸 总 结")
-    print(f"  三笔假提案{'全部被拦下 ✅（这正是我们要的）' if 全部拦下 else '没有全部被拦下，请查闸'}")
+    print("  R E H E A R S A L   S U M M A R Y")
+    print("  All three were stopped - which is the point." if 全部拦下
+          else "  NOT all three were stopped. Check the gate.")
     for 句 in 栽在哪:
         print(f"    {句}")
     线()
@@ -432,13 +444,14 @@ def 跑开(参):
             #    ⟹ 交易日一律以服务端时钟的美东时间戳为准。
             今天 = str(取键(时钟原始, "timestamp") or "")[:10] or date.today().isoformat()
             开市中 = bool(取键(时钟原始, "is_open", "isOpen"))
-            print(f"美东交易日 {今天}，{'开市中' if 开市中 else '休市'}")
+            print(f"US trading day {今天} - market {'open' if 开市中 else 'closed'}")
             if not 开市中:
                 if not getattr(参, "空转", False):
-                    print("现在休市，今天不开。休市期间不下任何单；想看闸怎么拦单，用「python3 跑.py 演闸」。")
+                    print("Market is shut, so nothing opens today. To watch the gate refuse "
+                          "an order right now, run: python3 agent.py rehearse")
                     return 0
                 # 空转本来就永远不下单，所以休市照走完整条链——这是休市期间唯一能验挑腿的路。
-                print("（休市 + 空转：整条链照走一遍，最后一步不下单。）")
+                print("(market shut + dry run: the whole chain runs, the final send is withheld)")
 
             # 2. 组装账户（是模拟盘：账户号以 PA 开头；当日盈亏 = equity - last_equity）
             账户原始 = 手柄.账户()
@@ -468,7 +481,7 @@ def 跑开(参):
             # 7. 结论不开就收工（这不是错误）
             if 书.get("结论") != "开" or 结果["提案"] is None:
                 理由 = str(书.get("不开的理由") or "判断书没给理由")
-                print(理由 if 理由.startswith("今天不开") else f"今天不开：{理由}")
+                print(理由 if 理由.startswith("今天不开") else f"Not opening today: {理由}")
                 return 0
             提案 = 结果["提案"]
             提案["编号"] = 编号
@@ -477,17 +490,17 @@ def 跑开(参):
             闸判 = 闸.过闸(提案, 账户, {"今天": 今天, "开市中": True})
             账本.记("闸", {"放行": bool(闸判.get("过")), "一句话": 闸判.get("一句话", ""),
                            "提案": 提案, "结果": 闸判}, 编号)
-            打印闸表("过 闸", 闸判, 提案)
+            打印闸表("T H E   G A T E", 闸判, 提案)
 
             # 9. 闸拦下不是错误，正常收工
             if 取键(闸判, "过") is not True:
-                print(f"⛔ 闸拦下了这一笔：{取键(闸判, '一句话') or '没给理由'}")
-                print("（被拦说明这单有不该开的毛病，拦下是好事）")
+                print(f"STOPPED by the gate: {取键(闸判, '一句话') or 'no reason given'}")
+                print("(a stop means the proposal had something wrong with it - that is the gate working)")
                 return 0
 
             # 10. 空转：闸已放行，但本次不下单
             if getattr(参, "空转", False):
-                print("（空转：闸已放行，但本次不下单）")
+                print("(dry run: the gate released it, but nothing was sent)")
                 return 0
 
             # 11. 真下单：先记「下单」，再发单，回执入账
@@ -502,13 +515,13 @@ def 跑开(参):
             单号 = 取键(回执, "id", "order_id", "orderId") or "？"
             状态 = 取键(回执, "status") or "？"
             print()
-            print(f"✅ 单已发出：单号 {单号}，状态 {状态}")
+            print(f"ORDER SENT: id {单号}, status {状态}")
             return 0
     except Exception as 错:
         # 12. 任何异常：先记进账本，再报中文错，退出码 1
         记错(账本, "开", 错)
-        print(f"⛔ 出错了，这一轮中止：{type(错).__name__}: {错}")
-        print("（细节已记进账本，可用「复盘」看当天全记录）")
+        print(f"ERROR - this pass is aborted: {type(错).__name__}: {错}")
+        print("(the detail is already in the ledger; run `recap` to see the full day)")
         return 1
 
 
@@ -525,10 +538,10 @@ def 跑平(参):
             持仓们 = 手柄.持仓() or []
             期权持仓们 = [p for p in 持仓们 if 取键(p, "asset_class", "assetClass") == "us_option"]
             线()
-            print("  平 仓 检 查")
+            print("  C L O S E   C H E C K")
             线()
             if not 期权持仓们:
-                print("  今天还没有持仓，无可平。")
+                print("  Nothing open, nothing to close.")
                 线()
                 return 0
             for 持仓 in 期权持仓们:
@@ -542,25 +555,25 @@ def 跑平(参):
                     理由 = "今天就是到期日，不留到收盘"
                 elif 浮盈 is None or 成本 is None or 成本 == 0:
                     # 找不到判断依据的持仓不许乱平
-                    print(f"  {合约:<20} 跳过：算不出该不该平")
+                    print(f"  {合约:<20} skipped: cannot work out whether to close")
                     continue
                 elif 浮盈 >= 0.5 * abs(成本):
                     理由 = (f"浮盈 {带号(浮盈)} 美元，已到成本 {钱样(abs(成本))} 美元的一半"
                             f"（{钱样(0.5 * abs(成本))} 美元）")
                 else:
-                    print(f"  {合约:<20} 不平：浮盈 {带号(浮盈)} 美元，不到成本 {钱样(abs(成本))} 美元的"
+                    print(f"  {合约:<20} holding: unrealised {带号(浮盈)}, short of the "
                           f"一半（{钱样(0.5 * abs(成本))} 美元），继续拿着")
                     continue
                 编号 = 账本.发号("P")
                 账本.记("下单", {"用途": "平仓", "合约": 合约, "理由": 理由, "幂等键": 编号}, 编号)
                 回执 = 手柄.平仓(合约)
                 账本.记("回执", 回执, 编号)
-                print(f"  {合约:<20} ✅ 已平——{理由}")
+                print(f"  {合约:<20} CLOSED - {理由}")
             线()
             return 0
     except Exception as 错:
         记错(账本, "平", 错)
-        print(f"⛔ 出错了：{type(错).__name__}: {错}")
+        print(f"ERROR: {type(错).__name__}: {错}")
         return 1
 
 
@@ -601,7 +614,7 @@ def 跑复盘(参):
     try:
         条目们 = 账本.读(今天) or []
     except Exception as 错:
-        print(f"⛔ 当天账本读不出来：{type(错).__name__}: {错}")
+        print(f"ERROR: today's ledger could not be read: {type(错).__name__}: {错}")
         return 1
     try:
         渲染 = 账本.渲染中文(今天) or ""
@@ -664,7 +677,7 @@ def 跑复盘(参):
     with open(文件, "w", encoding="utf-8") as 笔:
         笔.write(f"# {今天} 复盘\n\n" + "\n".join(小结行) + "\n\n---\n\n" + 渲染 + "\n")
     账本.记("复盘", {"文件": 文件, "小结": "\n".join(小结行)}, None)
-    print(f"复盘已写进：{文件}")
+    print(f"Recap written to: {文件}")
     return 0
 
 
@@ -750,7 +763,7 @@ def 主():
         raise
     except Exception as 错:
         # 兜底：不许让使用者看见一屏英文堆栈
-        print(f"⛔ 出错了，这一轮中止：{type(错).__name__}: {错}")
+        print(f"ERROR - aborted: {type(错).__name__}: {错}")
         码 = 1
     sys.exit(int(码 or 0))
 
