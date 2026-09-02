@@ -1,0 +1,36 @@
+[16:51:46] == 1/5 体检 ==
+================================================================
+  P R E F L I G H T   -   local checks first, then one live round-trip
+================================================================
+  [1 - offline]
+  OK   module gate.py imports
+  OK   module broker.py imports
+  OK   module ledger.py imports
+  OK   module strategy.py imports
+  OK   .env is present (existence only - it is never opened here)
+  [2 - live]
+  · the market is closed
+    next open      2026-09-02T09:30:00-04:00
+    account status ACTIVE
+    equity         $100,009.79
+    paper account  YES - the account number starts with PA
+================================================================
+PREFLIGHT GREEN
+[16:51:50] == 2/5 录一条真下单 ==
+✅ 素材-成交.mp4  8.333333s  48K
+[16:52:02] 录单退出码 0
+[16:52:02] == 3/5 平仓检查 ==
+================================================================
+  C L O S E   C H E C K
+================================================================
+  SPY260903C00774000   CLOSED - 浮盈 +54.00 美元，已到成本 59.00 美元的一半（29.50 美元）
+  SPY260903C00779000   holding: unrealised -13.00, short of the 一半（6.50 美元），继续拿着
+  SPY260903P00752000   holding: unrealised +12.00, short of the 一半（23.50 美元），继续拿着
+  SPY260903P00757000   holding: unrealised -43.00, short of the 一半（47.50 美元），继续拿着
+================================================================
+[16:52:06] == 4/5 复盘 ==
+Recap written to: /home/xin/AI项目/种子园/黑客松-alpaca/日志/2026-09-02.md
+[16:52:10] == 5/5 重拍第一屏 ==
+✅ 素材-第一屏.mp4  9.800000s  112K
+[16:52:24] 第一屏卡已重拍
+[16:52:24] == 今夜这一趟跑完 ==
