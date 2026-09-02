@@ -15,7 +15,9 @@ receipt is appended to a local ledger.
   its account, market-data, options-data, and trading tools.
 - An append-only sequence: written judgment → gate receipt → order request →
   Alpaca receipt.
-- A public, credential-free demo of the same pure gate in `app.py`.
+- A public, credential-free page (`app.py`) that shows one of those orders off
+  the ledger — the written judgment, the gate receipt, and the Alpaca order id —
+  and lets anyone bend that same trade until the production gate refuses it.
 
 ## The complete path
 
@@ -89,8 +91,19 @@ Open the live demo: <https://reason-before-result-llurb8m9jg7ryfpv598vhr.streaml
 streamlit run app.py
 ```
 
-The public app needs no secrets and cannot trade. It applies the production
-pure gate to visible sample proposals so every pass or stop can be inspected.
+The public app needs no secrets and cannot trade. It opens on a real order this
+agent placed — order id, capped loss, and the sentence it wrote down *before*
+sending — read out of `递送/证据.json`, a redacted snapshot of the append-only
+ledger that carries no account identifier and no key. Below it, the same trade
+is wired to the production gate: drop the protective legs, raise the size, push
+the expiry out, blank a quote, and `闸.py` re-decides live. At its default
+settings the page reproduces the ledger's own receipt word for word.
+
+Refreeze the snapshot from the local ledger with:
+
+```bash
+python 递送/冻证据.py
+```
 
 ## Repository map
 
@@ -103,7 +116,8 @@ pure gate to visible sample proposals so every pass or stop can be inspected.
 | `账.py` | Append-only JSONL ledger and Chinese human rendering |
 | `闸自检.py` | Ten deterministic gate cases |
 | `手自检.py` | Ledger/client static and persistence checks |
-| `app.py` | Credential-free, read-only Streamlit demonstration |
+| `app.py` | Credential-free public page: one real receipt, plus a live gate to push on |
+| `递送/冻证据.py` | Freezes a redacted evidence snapshot out of the ledger into `递送/证据.json` |
 
 Runtime ledgers, logs, account identifiers, participant data, credentials, and
 the local virtual environment are excluded from Git.
