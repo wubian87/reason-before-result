@@ -7,7 +7,7 @@ receipt is appended to a local ledger.
 
 > Paper trading only. No real capital. This project is not investment advice.
 
-**[Two-minute demo video](https://youtu.be/6-u2ReXTkh4)** · **[Live demo](https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/)**
+**[Two-minute demo video](https://youtu.be/6-u2ReXTkh4)** · **[Live demo](https://reason-before-result-llurb8m9jg7ryfpv598vhr.streamlit.app/)** · **[One-page technical brief](delivery/one-pager.pdf)**
 
 ## What judges can verify
 
